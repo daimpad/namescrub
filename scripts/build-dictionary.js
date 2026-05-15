@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * Downloads the German wortliste and builds a compact dictionary JSON.
- * Output: public/dictionary.json — an array of lowercase German words.
- * The Worker loads this once and builds a Set for O(1) lookups.
+ * Downloads a German common-words list (NO proper nouns) and builds a
+ * compact JSON array for O(1) Set lookups in the Web Worker.
+ * Output: public/dictionary.json
+ *
+ * Source priority:
+ * 1. enz/german-wordlist — spell-check list, explicitly excludes proper nouns
+ * 2. wooorm/dictionaries Hunspell DE — another clean common-words source
  */
 
-import { createWriteStream, mkdirSync } from 'fs'
-import { writeFile, readFile } from 'fs/promises'
-import { createGunzip } from 'zlib'
-import { pipeline } from 'stream/promises'
+import { mkdirSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -17,17 +19,13 @@ const ROOT = path.resolve(__dirname, '..')
 const OUT_DIR = path.join(ROOT, 'public')
 const OUT_FILE = path.join(OUT_DIR, 'dictionary.json')
 
-// Igno words shorter than this to cut noise
 const MIN_LENGTH = 3
 
-// German honorifics — used by the Worker for priority-marking but defined here for reference
-const HONORIFICS = new Set(['herr', 'frau', 'dr', 'prof', 'sr', 'jr', 'mag', 'ing', 'dipl'])
-
 const SOURCES = [
-  // Primary: Wiktionary-derived German word list (plain text, one word per line)
-  'https://raw.githubusercontent.com/davidak/wortliste/master/wortliste.txt',
-  // Fallback: smaller SCOWL-derived list
-  'https://raw.githubusercontent.com/nicowillis/german-words/master/german.txt',
+  // Primary: spell-check list — explicitly excludes proper nouns/names/places
+  'https://raw.githubusercontent.com/enz/german-wordlist/master/words',
+  // Fallback: Hunspell DE base form list (also no proper nouns)
+  'https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/de/index.dic',
 ]
 
 async function fetchText(url) {
@@ -41,10 +39,12 @@ async function buildDictionary() {
   mkdirSync(OUT_DIR, { recursive: true })
 
   let rawText = null
+  let sourceUsed = ''
   for (const url of SOURCES) {
     try {
       rawText = await fetchText(url)
-      console.log(`Downloaded ${rawText.length.toLocaleString()} bytes`)
+      sourceUsed = url
+      console.log(`Downloaded ${rawText.length.toLocaleString()} bytes from ${url}`)
       break
     } catch (err) {
       console.warn(`Source failed (${err.message}), trying next...`)
@@ -52,29 +52,38 @@ async function buildDictionary() {
   }
 
   if (!rawText) {
-    throw new Error('All dictionary sources failed. Cannot build dictionary.')
+    throw new Error('All dictionary sources failed.')
   }
 
   const words = new Set()
+  const isHunspell = sourceUsed.includes('wooorm')
+
   for (const line of rawText.split('\n')) {
-    const word = line.trim()
-    if (!word || word.startsWith('#')) continue
-    // The davidak list uses ";" as separator between forms — take first form
-    const base = word.split(';')[0].trim().toLowerCase()
-    if (base.length >= MIN_LENGTH && /^[a-zäöüß]+$/i.test(base)) {
-      words.add(base)
+    let word = line.trim()
+    if (!word || word.startsWith('#') || word.startsWith('%')) continue
+
+    if (isHunspell) {
+      // Hunspell .dic format: "word/FLAGS" or just "word" — skip proper nouns (uppercase)
+      word = word.split('/')[0].trim()
+      // Skip entries starting with uppercase → proper nouns in Hunspell
+      if (/^[A-ZÄÖÜ]/.test(word)) continue
+    }
+
+    const lower = word.toLowerCase()
+    if (lower.length >= MIN_LENGTH && /^[a-zäöüß\-]+$/.test(lower)) {
+      words.add(lower)
     }
   }
 
-  // Also add common German function words / articles that may not be in the list
+  // Essential German function words guaranteed to be present
   const essentials = [
     'der','die','das','den','dem','des','ein','eine','einer','einem','einen','eines',
     'und','oder','aber','weil','wenn','dass','ob','als','wie','bis','seit','nach',
     'vor','über','unter','neben','zwischen','auf','an','in','im','am','vom','zum',
-    'zur','bei','mit','ohne','durch','für','gegen','um','aus','von','zu','nach',
-    'ich','du','er','sie','es','wir','ihr','sie','mich','dich','sich','uns','euch',
-    'mir','dir','ihm','ihr','uns','euch','ihnen','mein','dein','sein','ihr','unser',
-    'euer','ihr','kein','keine','nicht','ist','sind','war','waren','hat','haben',
+    'zur','bei','mit','ohne','durch','für','gegen','um','aus','von','zu',
+    'ich','du','er','sie','es','wir','ihr','mich','dich','sich','uns','euch',
+    'mir','dir','ihm','ihnen','mein','dein','sein','unser','euer',
+    'kein','keine','nicht','ist','sind','war','waren','hat','haben',
     'hatte','hatten','wird','werden','wurde','wurden','kann','können','konnte',
     'muss','müssen','musste','soll','sollen','sollte','will','wollen','wollte',
     'darf','dürfen','durfte','mag','mögen','mochte','ja','nein','auch','noch',
@@ -87,8 +96,7 @@ async function buildDictionary() {
   await writeFile(OUT_FILE, JSON.stringify(arr))
 
   console.log(`Dictionary built: ${arr.length.toLocaleString()} words → ${OUT_FILE}`)
-  const sizeKB = (JSON.stringify(arr).length / 1024).toFixed(1)
-  console.log(`File size: ~${sizeKB} KB`)
+  console.log(`File size: ~${(JSON.stringify(arr).length / 1024).toFixed(1)} KB`)
 }
 
 buildDictionary().catch(err => {

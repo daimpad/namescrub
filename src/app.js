@@ -1,5 +1,3 @@
-import workerUrl from './worker.js?worker&url'
-
 // ── Worker bridge ──────────────────────────────────────────────────────────
 
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
@@ -21,18 +19,20 @@ function call(action, payload = {}) {
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-let currentTokens = []   // { text, type }[]
-let dictReady = false
+let currentTokens = []
+let nameMap = new Map()   // lowercase name → "Name-1", "Name-2", …
+let nameCounter = 0
+let activePopup = null
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 
-const inputEl   = document.getElementById('input')
-const outputEl  = document.getElementById('output')
+const inputEl    = document.getElementById('input')
+const outputEl   = document.getElementById('output')
 const analyseBtn = document.getElementById('btn-analyse')
-const purgeBtn  = document.getElementById('btn-purge')
-const copyBtn   = document.getElementById('btn-copy')
-const statusEl  = document.getElementById('status')
-const statsEl   = document.getElementById('stats')
+const purgeBtn   = document.getElementById('btn-purge')
+const copyBtn    = document.getElementById('btn-copy')
+const statusEl   = document.getElementById('status')
+const statsEl    = document.getElementById('stats')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -40,16 +40,13 @@ async function init() {
   setStatus('Wörterbuch wird geladen…', 'loading')
   analyseBtn.disabled = true
 
-  // base URL so the Worker can fetch dictionary.json
-  const base = import.meta.env.BASE_URL
-
-  const res = await call('init', { base })
+  const dictUrl = new URL('dictionary.json', window.location.href).href
+  const res = await call('init', { dictUrl })
   if (!res.ok) {
     setStatus(`Fehler beim Laden des Wörterbuchs: ${res.error}`, 'error')
     return
   }
 
-  dictReady = true
   setStatus('Bereit. Text einfügen und Analyse starten.', 'ready')
   analyseBtn.disabled = false
 }
@@ -63,14 +60,104 @@ async function analyse() {
   setStatus('Analyse läuft…', 'loading')
   analyseBtn.disabled = true
   outputEl.innerHTML = ''
+  closePopup()
 
   const res = await call('analyse', { text })
   analyseBtn.disabled = false
-
   if (!res.ok) { setStatus(`Fehler: ${res.error}`, 'error'); return }
 
   currentTokens = res.tokens
+  nameMap = new Map()
+  nameCounter = 0
   renderOutput()
+}
+
+// ── Name mapping ───────────────────────────────────────────────────────────
+
+function normKey(text) {
+  return text.replace(/^[^a-zA-ZäöüÄÖÜß]+|[^a-zA-ZäöüÄÖÜß]+$/gu, '').toLowerCase()
+}
+
+function getPlaceholder(text) {
+  const key = normKey(text)
+  if (!nameMap.has(key)) {
+    nameCounter++
+    nameMap.set(key, `Name-${nameCounter}`)
+  }
+  return nameMap.get(key)
+}
+
+function peekPlaceholder(text) {
+  const key = normKey(text)
+  if (nameMap.has(key)) return nameMap.get(key)
+  return `Name-${nameCounter + 1}`
+}
+
+// Replace all tokens with the same name in one go
+function replaceAllByName(text) {
+  const key = normKey(text)
+  const placeholder = getPlaceholder(text)
+  currentTokens = currentTokens.map(tok => {
+    if ((tok.type === 'name' || tok.type === 'honorific-name') && normKey(tok.text) === key) {
+      return { ...tok, type: 'replaced', placeholder }
+    }
+    return tok
+  })
+}
+
+// ── Popup ──────────────────────────────────────────────────────────────────
+
+function closePopup() {
+  if (activePopup) { activePopup.remove(); activePopup = null }
+}
+
+function showPopup(span, idx) {
+  closePopup()
+
+  const tok = currentTokens[idx]
+  const placeholder = peekPlaceholder(tok.text)
+
+  const popup = document.createElement('div')
+  popup.className = 'name-popup'
+
+  const btnDelete = document.createElement('button')
+  btnDelete.className = 'popup-btn delete'
+  btnDelete.textContent = '× Löschen'
+  btnDelete.addEventListener('click', (e) => {
+    e.stopPropagation()
+    currentTokens[idx] = { ...tok, type: 'removed', text: '' }
+    closePopup()
+    renderOutput()
+  })
+
+  const btnFalsePositive = document.createElement('button')
+  btnFalsePositive.className = 'popup-btn false-positive'
+  btnFalsePositive.textContent = '✓ Kein Name'
+  btnFalsePositive.addEventListener('click', (e) => {
+    e.stopPropagation()
+    currentTokens[idx] = { ...tok, type: 'word' }
+    closePopup()
+    renderOutput()
+  })
+
+  const btnReplace = document.createElement('button')
+  btnReplace.className = 'popup-btn replace'
+  btnReplace.textContent = `↔ ${placeholder}`
+  btnReplace.addEventListener('click', (e) => {
+    e.stopPropagation()
+    replaceAllByName(tok.text)
+    closePopup()
+    renderOutput()
+  })
+
+  popup.appendChild(btnDelete)
+  popup.appendChild(btnFalsePositive)
+  popup.appendChild(btnReplace)
+
+  // Position unterhalb des Tokens
+  span.style.position = 'relative'
+  span.appendChild(popup)
+  activePopup = popup
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -90,14 +177,19 @@ function renderOutput() {
       const span = document.createElement('span')
       span.className = tok.type === 'honorific-name' ? 'token name honorific' : 'token name'
       span.textContent = tok.text
-      span.title = 'Klicken zum Entfernen'
-      span.dataset.idx = idx
-      span.addEventListener('click', () => removeToken(idx))
+      span.title = 'Klicken für Optionen'
+      span.addEventListener('click', (e) => {
+        e.stopPropagation()
+        showPopup(span, idx)
+      })
       outputEl.appendChild(span)
-    } else if (tok.type !== 'skip') {
-      outputEl.appendChild(document.createTextNode(tok.text))
+    } else if (tok.type === 'replaced') {
+      const span = document.createElement('span')
+      span.className = 'token replaced'
+      span.textContent = tok.placeholder
+      outputEl.appendChild(span)
     } else {
-      outputEl.appendChild(document.createTextNode(tok.text))
+      outputEl.appendChild(document.createTextNode(tok.text ?? ''))
     }
   })
 
@@ -106,25 +198,24 @@ function renderOutput() {
     ? `${nameCount} verdächtige${nameCount === 1 ? 's Wort' : ' Wörter'} von ${total} erkannt`
     : `Keine verdächtigen Wörter gefunden (${total} Tokens)`
 
-  setStatus(nameCount > 0 ? 'Markierte Wörter per Klick entfernen oder „Namen entfernen" drücken.' : 'Analyse abgeschlossen.', 'ready')
+  setStatus(
+    nameCount > 0 ? 'Auf markierte Wörter klicken — Löschen oder Name-X ersetzen.' : 'Analyse abgeschlossen.',
+    'ready'
+  )
   purgeBtn.disabled = nameCount === 0
   copyBtn.disabled = false
 }
 
-function removeToken(idx) {
-  currentTokens[idx].type = 'removed'
-  currentTokens[idx].text = ''
-  renderOutput()
-}
-
-// ── Purge ──────────────────────────────────────────────────────────────────
+// ── Bulk replace ───────────────────────────────────────────────────────────
 
 function purge() {
-  currentTokens = currentTokens.map(tok =>
-    (tok.type === 'name' || tok.type === 'honorific-name')
-      ? { ...tok, type: 'removed', text: '' }
-      : tok
-  )
+  // Alle verbleibenden Namen automatisch nummerieren und ersetzen
+  currentTokens = currentTokens.map(tok => {
+    if (tok.type !== 'name' && tok.type !== 'honorific-name') return tok
+    const placeholder = getPlaceholder(tok.text)
+    return { ...tok, type: 'replaced', placeholder }
+  })
+  closePopup()
   renderOutput()
 }
 
@@ -154,7 +245,9 @@ analyseBtn.addEventListener('click', analyse)
 purgeBtn.addEventListener('click', purge)
 copyBtn.addEventListener('click', copyToClipboard)
 
-// Allow Ctrl+Enter to trigger analysis from the textarea
+// Popup schließen bei Klick außerhalb
+document.addEventListener('click', closePopup)
+
 inputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyse()
 })
