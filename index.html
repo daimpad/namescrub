@@ -20,14 +20,16 @@
 <body>
 
 <header>
-  <div class="header-left">
+  <div class="header-inner">
     <img src="./namescrub_logo_long.svg" alt="NameScrub" class="header-logo" />
-    <span class="header-sub">Anonymisierung deutscher Texte — direkt im Browser.</span>
+    <p class="header-sub">Anonymisierung deutscher Texte — direkt im Browser.</p>
   </div>
-  <span id="header-status" class="header-status">Wörterbuch wird geladen…</span>
+  <span id="header-status" class="header-status"></span>
 </header>
 
 <main>
+
+  <div class="input-hint" id="input-hint">Bereit. Text einfügen und Analyse starten.</div>
 
   <div class="panel input-panel">
     <div class="panel-label">Eingabe</div>
@@ -43,8 +45,6 @@
     <div class="panel-label">Ergebnis — Namen anklicken für Optionen</div>
     <div id="output" aria-live="polite" aria-label="Analysierter Text"></div>
   </div>
-
-  <div class="input-hint" id="input-hint">Bereit. Text einfügen und Analyse starten.</div>
 
   <div class="controls">
     <span id="status" class="status-hidden" aria-live="polite"></span>
