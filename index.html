@@ -34,7 +34,7 @@
 
   <!-- Output -->
   <div class="panel output-panel">
-    <div class="panel-label">Ergebnis — verdächtige Wörter anklicken zum Entfernen</div>
+    <div class="panel-label" id="output-label">Ergebnis — verdächtige Wörter anklicken zum Entfernen</div>
     <div id="output" aria-live="polite" aria-label="Analysierter Text"></div>
   </div>
 
@@ -42,6 +42,16 @@
   <div class="controls">
     <span id="status" class="status loading">Wörterbuch wird geladen…</span>
     <button id="btn-analyse" disabled>Analyse starten</button>
+
+    <!-- Modus-Toggle -->
+    <label class="mode-toggle-wrap" title="Wechsel zwischen Löschen und [ANONYMISIERT]-Ersatz">
+      <input type="checkbox" id="mode-toggle" />
+      <span class="mode-toggle-track">
+        <span class="mode-toggle-thumb"></span>
+      </span>
+      <span id="mode-label" class="mode-label">Löschen</span>
+    </label>
+
     <button id="btn-purge"   disabled>Namen entfernen</button>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
   </div>
@@ -50,10 +60,13 @@
   <div class="legend">
     <span id="stats"></span>
     <span class="legend-item">
-      <span class="legend-swatch name"></span> Möglicher Name (klicken zum Löschen)
+      <span class="legend-swatch name"></span> Möglicher Name
     </span>
     <span class="legend-item">
-      <span class="legend-swatch honorific"></span> Name nach Anrede (Priorität)
+      <span class="legend-swatch honorific"></span> Name nach Anrede
+    </span>
+    <span class="legend-item">
+      <span class="legend-swatch anonymised"></span> [ANONYMISIERT]
     </span>
   </div>
 

@@ -155,6 +155,66 @@ main {
   box-shadow: 2px 2px 0 var(--black);
 }
 
+.token.anonymised {
+  background: var(--black);
+  color: var(--yellow);
+  font-weight: 900;
+  font-size: 0.8em;
+  padding: 1px 4px;
+  letter-spacing: 0.04em;
+  display: inline;
+  cursor: default;
+}
+
+/* ── Mode toggle ──────────────────────────────────────────────────────── */
+.mode-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.mode-toggle-wrap input[type="checkbox"] { display: none; }
+
+.mode-toggle-track {
+  width: 2.8rem;
+  height: 1.4rem;
+  background: var(--white);
+  border: var(--border);
+  box-shadow: var(--shadow);
+  position: relative;
+  display: block;
+  transition: background 0.15s;
+}
+
+.mode-toggle-wrap input:checked + .mode-toggle-track { background: var(--yellow); }
+
+.mode-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  background: var(--black);
+  transition: left 0.15s;
+  display: block;
+}
+
+.mode-toggle-wrap input:checked + .mode-toggle-track .mode-toggle-thumb {
+  left: calc(100% - 1rem - 2px);
+}
+
+.mode-label {
+  font-family: var(--font);
+  font-weight: 900;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 7rem;
+}
+
 /* ── Controls bar ─────────────────────────────────────────────────────── */
 .controls {
   grid-column: 1 / 3;
@@ -264,8 +324,9 @@ button:disabled {
   display: inline-block;
 }
 
-.legend-swatch.name    { background: var(--yellow); }
-.legend-swatch.honorific { background: var(--yellow2); box-shadow: 2px 2px 0 var(--black); }
+.legend-swatch.name       { background: var(--yellow); }
+.legend-swatch.honorific  { background: var(--yellow2); box-shadow: 2px 2px 0 var(--black); }
+.legend-swatch.anonymised { background: var(--black); }
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
 footer {

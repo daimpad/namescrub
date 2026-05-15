@@ -1,5 +1,3 @@
-import workerUrl from './worker.js?worker&url'
-
 // ── Worker bridge ──────────────────────────────────────────────────────────
 
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
@@ -21,18 +19,20 @@ function call(action, payload = {}) {
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-let currentTokens = []   // { text, type }[]
-let dictReady = false
+let currentTokens = []
+let replaceMode = false   // false = löschen, true = [ANONYMISIERT]
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 
-const inputEl   = document.getElementById('input')
-const outputEl  = document.getElementById('output')
-const analyseBtn = document.getElementById('btn-analyse')
-const purgeBtn  = document.getElementById('btn-purge')
-const copyBtn   = document.getElementById('btn-copy')
-const statusEl  = document.getElementById('status')
-const statsEl   = document.getElementById('stats')
+const inputEl     = document.getElementById('input')
+const outputEl    = document.getElementById('output')
+const analyseBtn  = document.getElementById('btn-analyse')
+const purgeBtn    = document.getElementById('btn-purge')
+const copyBtn     = document.getElementById('btn-copy')
+const statusEl    = document.getElementById('status')
+const statsEl     = document.getElementById('stats')
+const modeToggle  = document.getElementById('mode-toggle')
+const modeLabelEl = document.getElementById('mode-label')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +40,6 @@ async function init() {
   setStatus('Wörterbuch wird geladen…', 'loading')
   analyseBtn.disabled = true
 
-  // base URL so the Worker can fetch dictionary.json
   const base = import.meta.env.BASE_URL
 
   const res = await call('init', { base })
@@ -49,7 +48,6 @@ async function init() {
     return
   }
 
-  dictReady = true
   setStatus('Bereit. Text einfügen und Analyse starten.', 'ready')
   analyseBtn.disabled = false
 }
@@ -90,12 +88,15 @@ function renderOutput() {
       const span = document.createElement('span')
       span.className = tok.type === 'honorific-name' ? 'token name honorific' : 'token name'
       span.textContent = tok.text
-      span.title = 'Klicken zum Entfernen'
+      span.title = replaceMode ? 'Klicken → [ANONYMISIERT]' : 'Klicken zum Entfernen'
       span.dataset.idx = idx
-      span.addEventListener('click', () => removeToken(idx))
+      span.addEventListener('click', () => handleTokenClick(idx))
       outputEl.appendChild(span)
-    } else if (tok.type !== 'skip') {
-      outputEl.appendChild(document.createTextNode(tok.text))
+    } else if (tok.type === 'anonymised') {
+      const span = document.createElement('span')
+      span.className = 'token anonymised'
+      span.textContent = '[ANONYMISIERT]'
+      outputEl.appendChild(span)
     } else {
       outputEl.appendChild(document.createTextNode(tok.text))
     }
@@ -106,27 +107,49 @@ function renderOutput() {
     ? `${nameCount} verdächtige${nameCount === 1 ? 's Wort' : ' Wörter'} von ${total} erkannt`
     : `Keine verdächtigen Wörter gefunden (${total} Tokens)`
 
-  setStatus(nameCount > 0 ? 'Markierte Wörter per Klick entfernen oder „Namen entfernen" drücken.' : 'Analyse abgeschlossen.', 'ready')
+  setStatus(
+    nameCount > 0
+      ? `Markierte Wörter per Klick ${replaceMode ? 'ersetzen' : 'entfernen'} oder „Namen entfernen" drücken.`
+      : 'Analyse abgeschlossen.',
+    'ready'
+  )
   purgeBtn.disabled = nameCount === 0
   copyBtn.disabled = false
 }
 
-function removeToken(idx) {
-  currentTokens[idx].type = 'removed'
-  currentTokens[idx].text = ''
+function handleTokenClick(idx) {
+  if (replaceMode) {
+    currentTokens[idx] = { ...currentTokens[idx], type: 'anonymised' }
+  } else {
+    currentTokens[idx] = { ...currentTokens[idx], type: 'removed', text: '' }
+  }
   renderOutput()
 }
 
-// ── Purge ──────────────────────────────────────────────────────────────────
+// ── Purge (alle Namen) ─────────────────────────────────────────────────────
 
 function purge() {
-  currentTokens = currentTokens.map(tok =>
-    (tok.type === 'name' || tok.type === 'honorific-name')
-      ? { ...tok, type: 'removed', text: '' }
-      : tok
-  )
+  currentTokens = currentTokens.map(tok => {
+    if (tok.type !== 'name' && tok.type !== 'honorific-name') return tok
+    return replaceMode
+      ? { ...tok, type: 'anonymised' }
+      : { ...tok, type: 'removed', text: '' }
+  })
   renderOutput()
 }
+
+// ── Mode toggle ────────────────────────────────────────────────────────────
+
+function updateModeLabel() {
+  modeLabelEl.textContent = replaceMode ? '[ANONYMISIERT]' : 'Löschen'
+  purgeBtn.textContent = replaceMode ? 'Namen ersetzen' : 'Namen entfernen'
+}
+
+modeToggle.addEventListener('change', () => {
+  replaceMode = modeToggle.checked
+  updateModeLabel()
+  if (currentTokens.length) renderOutput()
+})
 
 // ── Copy ───────────────────────────────────────────────────────────────────
 
@@ -154,9 +177,9 @@ analyseBtn.addEventListener('click', analyse)
 purgeBtn.addEventListener('click', purge)
 copyBtn.addEventListener('click', copyToClipboard)
 
-// Allow Ctrl+Enter to trigger analysis from the textarea
 inputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyse()
 })
 
+updateModeLabel()
 init()
