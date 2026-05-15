@@ -26,14 +26,15 @@ let activePopup = null
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 
-const inputEl    = document.getElementById('input')
-const outputEl   = document.getElementById('output')
-const analyseBtn = document.getElementById('btn-analyse')
-const purgeBtn   = document.getElementById('btn-purge')
-const copyBtn    = document.getElementById('btn-copy')
-const statusEl      = document.getElementById('status')
+const inputEl      = document.getElementById('input')
+const outputEl     = document.getElementById('output')
+const analyseBtn   = document.getElementById('btn-analyse')
+const purgeBtn     = document.getElementById('btn-purge')
+const copyBtn      = document.getElementById('btn-copy')
+const statusEl     = document.getElementById('status')
 const headerStatusEl = document.getElementById('header-status')
-const statsEl    = document.getElementById('stats')
+const inputHintEl  = document.getElementById('input-hint')
+const statsEl      = document.getElementById('stats')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -237,8 +238,7 @@ async function copyToClipboard() {
 
 function setStatus(msg, type = 'ready') {
   statusEl.textContent = msg
-  headerStatusEl.textContent = msg
-  headerStatusEl.className = `header-status ${type}`
+  inputHintEl.textContent = msg
 }
 
 // ── Event listeners ────────────────────────────────────────────────────────
