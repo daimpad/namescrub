@@ -50,6 +50,26 @@ const COMMON_SURNAMES = new Set([
 // these still get flagged (e.g. "Goldmann", "Rosenstein").
 const NAME_SUFFIX_RE = /(mann|stein|berg|thal|tal|feld|burg|hausen|dorf|beck|ow|ke|ki)$/i
 
+// German legal / organisational forms — never personal names.
+const LEGAL_FORMS = new Set([
+  'gmbh', 'ag', 'kg', 'kgaa', 'ohg', 'gbr', 'ug', 'ev', 'se',
+  'mbh', 'sarl', 'llc', 'ltd', 'inc', 'bv', 'nv',
+])
+
+// Abbreviations that end in "." but are NOT sentence boundaries.
+// Used in findSentenceStarts to avoid false sentence splits.
+const SENT_ABBREV = new Set([
+  // Honorifics (without trailing dot — normalised below)
+  'dr', 'prof', 'hr', 'fr', 'sr', 'jr', 'mag', 'ing', 'dipl',
+  // Common German abbreviations
+  'nr', 'str', 'tel', 'fax', 'abs', 'art', 'abb', 'ca', 'ggf',
+  'inkl', 'exkl', 'evtl', 'zzgl', 'mwst', 'bsp', 'vgl', 'usw',
+  'bzw', 'etc', 'zb', 'dh', 'ua', 'oa', 'ff', 'ibd',
+  // Months
+  'jan', 'feb', 'mär', 'mar', 'apr', 'jun', 'jul',
+  'aug', 'sep', 'sept', 'okt', 'nov', 'dez',
+])
+
 /** Lazily loaded dictionary Set */
 let dict = null
 
@@ -71,12 +91,19 @@ function normalise(token) {
 }
 
 /**
- * Improvement 4: all-caps short tokens are abbreviations (GmbH, AG, USA, VW).
- * Strips dots first to handle "e.V." → "eV".
+ * Improvement 4: abbreviation detection.
+ * Covers all-caps (AG, USA), mixed-case org forms (GmbH, KGaA),
+ * and dot-separated abbreviations (e.V., z.B.).
  */
 function isAbbreviation(raw) {
   const nodots = raw.replace(/\./g, '')
-  return /^[A-ZÄÖÜ0-9]{1,5}$/.test(nodots) && nodots.length >= 2
+  if (nodots.length < 2 || nodots.length > 7) return false
+  // All uppercase/digit: AG, USA, VW, NATO
+  if (/^[A-ZÄÖÜ0-9]+$/.test(nodots)) return true
+  // Mixed-case with at least 2 uppercase letters: GmbH, KGaA, GbR
+  const uppers = (nodots.match(/[A-ZÄÖÜ]/g) || []).length
+  if (uppers >= 2 && nodots.length <= 6) return true
+  return false
 }
 
 /**
@@ -127,7 +154,10 @@ function classify(token, index, tokens, sentenceStarts) {
   // Particle → skip (transparent, handled in chaining passes)
   if (PARTICLES.has(lower)) return 'skip'
 
-  // Improvement 4: abbreviation → skip
+  // Legal / org form → skip (GmbH, AG, e.V. …)
+  if (LEGAL_FORMS.has(lower)) return 'skip'
+
+  // Improvement 4: abbreviation → skip (all-caps, mixed-caps short tokens)
   if (isAbbreviation(clean)) return 'skip'
 
   // Word after an honorific (searching back through particles and whitespace)
@@ -163,15 +193,25 @@ function tokenise(text) {
 
 /**
  * Identify token indices that start a new sentence.
+ * Skips abbreviation periods: "Dr.", "Nr.", "Jan." are not sentence ends.
  */
 function findSentenceStarts(tokens) {
   const starts = new Set()
   starts.add(0)
   for (let i = 0; i < tokens.length; i++) {
-    if (/[.!?…]\s*$/.test(tokens[i])) {
+    if (!/[.!?…]\s*$/.test(tokens[i])) continue
+    // Treat "!" and "?" always as sentence ends; for "." check if abbreviation
+    if (/[!?…]\s*$/.test(tokens[i])) {
       for (let j = i + 1; j < tokens.length; j++) {
         if (tokens[j].trim()) { starts.add(j); break }
       }
+      continue
+    }
+    // "." — only a sentence end if the token is not a known abbreviation
+    const stem = tokens[i].trim().toLowerCase().replace(/\.+$/, '')
+    if (SENT_ABBREV.has(stem) || HONORIFICS.has(stem)) continue
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (tokens[j].trim()) { starts.add(j); break }
     }
   }
   return starts
