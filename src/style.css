@@ -220,6 +220,14 @@ main {
 
 .popup-btn.delete:hover { background: #333; }
 
+.popup-btn.false-positive {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+  border-right: var(--nz-stroke);
+}
+
+.popup-btn.false-positive:hover { background: var(--nz-paper-alt); }
+
 .popup-btn.replace {
   background: var(--nz-green);
   color: var(--nz-ink);

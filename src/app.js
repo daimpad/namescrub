@@ -130,6 +130,16 @@ function showPopup(span, idx) {
     renderOutput()
   })
 
+  const btnFalsePositive = document.createElement('button')
+  btnFalsePositive.className = 'popup-btn false-positive'
+  btnFalsePositive.textContent = '✓ Kein Name'
+  btnFalsePositive.addEventListener('click', (e) => {
+    e.stopPropagation()
+    currentTokens[idx] = { ...tok, type: 'word' }
+    closePopup()
+    renderOutput()
+  })
+
   const btnReplace = document.createElement('button')
   btnReplace.className = 'popup-btn replace'
   btnReplace.textContent = `↔ ${placeholder}`
@@ -141,6 +151,7 @@ function showPopup(span, idx) {
   })
 
   popup.appendChild(btnDelete)
+  popup.appendChild(btnFalsePositive)
   popup.appendChild(btnReplace)
 
   // Position unterhalb des Tokens
