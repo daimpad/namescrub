@@ -29,6 +29,27 @@ const PARTICLES = new Set([
   'ten', 'den', 'la', 'le', 'el', 'af', 'av', 'der',
 ])
 
+// Improvement 9: very common German surnames that also exist as dictionary
+// words (occupations, adjectives). Flagged as name candidates even when the
+// dict would return true, because in personal-text context they're names.
+const COMMON_SURNAMES = new Set([
+  'müller', 'schneider', 'fischer', 'meyer', 'weber', 'schulz', 'wagner',
+  'becker', 'hoffmann', 'schäfer', 'koch', 'bauer', 'richter', 'klein',
+  'wolf', 'schröder', 'neumann', 'schwarz', 'zimmermann', 'braun',
+  'krüger', 'hofmann', 'hartmann', 'lange', 'schmitt', 'werner', 'schmitz',
+  'krause', 'meier', 'lehmann', 'schmid', 'schulze', 'maier', 'köhler',
+  'herrmann', 'könig', 'walter', 'mayer', 'huber', 'kaiser', 'fuchs',
+  'lang', 'möller', 'weiß', 'jung', 'hahn', 'schubert', 'vogel',
+  'keller', 'frank', 'berger', 'winkler', 'roth', 'beck', 'baumann',
+  'schuster', 'simon', 'böhm', 'winter', 'kraus', 'kramer', 'ritter',
+  'engel', 'stern', 'sommer', 'graf', 'kurz', 'sauer', 'gross', 'groß',
+])
+
+// Improvement 7: word endings strongly associated with German surnames.
+// Applied after the dict check so common-word stems that happen to end in
+// these still get flagged (e.g. "Goldmann", "Rosenstein").
+const NAME_SUFFIX_RE = /(mann|stein|berg|thal|tal|feld|burg|hausen|dorf|beck|ow|ke|ki)$/i
+
 /** Lazily loaded dictionary Set */
 let dict = null
 
@@ -113,14 +134,22 @@ function classify(token, index, tokens, sentenceStarts) {
   const preceding = prevWords(tokens, index, 5)
   if (preceding.some(w => HONORIFICS.has(w))) return 'honorific-name'
 
-  // Dictionary check (improvement 2: with suffix stripping)
-  if (inDict(lower)) return 'word'
+  const firstLetter = token.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
+  const startsUpper = /^[A-ZÄÖÜ]$/.test(firstLetter)
 
-  // Sentence-start: capitalised common nouns are normal in German
-  if (sentenceStarts.has(index) && inDict(lower)) return 'word'
+  // Improvement 9: known surname overrides dict — "Müller" mid-sentence is a name
+  if (COMMON_SURNAMES.has(lower) && startsUpper) return 'name'
+
+  // Dictionary check (improvement 2: with suffix stripping)
+  if (inDict(lower)) {
+    // Improvement 7: word in dict but ends with a name-typical suffix and starts
+    // uppercase mid-sentence → likely a surname (e.g. "Goldmann", "Rosenstein")
+    if (startsUpper && !sentenceStarts.has(index) && NAME_SUFFIX_RE.test(lower)) return 'name'
+    return 'word'
+  }
 
   // Starts with uppercase → candidate name
-  if (/^[A-ZÄÖÜ]/.test(token.replace(/^[^a-zA-ZäöüÄÖÜß]+/, ''))) return 'name'
+  if (startsUpper) return 'name'
 
   return 'word'
 }
@@ -221,6 +250,27 @@ function analyse(text) {
           result[i] = { ...result[i], type: 'name' }
         }
       }
+    }
+  }
+
+  // ── Pass 4: bilateral context (look forward) ──────────────────────────
+  // Improvement 11: a 'word' that starts with uppercase and is NOT in the
+  // dictionary, immediately preceding a confirmed name, is very likely a
+  // first name whose base form happened to be a dict word — promote it.
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type !== 'word') continue
+    const raw = result[i].text
+    const clean = normalise(raw)
+    const lower = clean.toLowerCase()
+    const fl = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
+    if (!/^[A-ZÄÖÜ]$/.test(fl)) continue
+    if (inDict(lower)) continue   // genuine dict word → skip
+
+    // Find the next non-space, non-particle content token
+    const j = nextContentToken(result, i, 1)
+    if (j === -1) continue
+    if (result[j].type === 'name' || result[j].type === 'honorific-name') {
+      result[i] = { ...result[i], type: 'name' }
     }
   }
 
