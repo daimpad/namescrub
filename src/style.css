@@ -38,29 +38,30 @@ header {
   background: var(--nz-paper);
 }
 
-.header-inner {
+.header-inner,
+.header-left {
   max-width: 1400px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 2rem 1rem;
+  padding: 1.25rem 2rem;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1.25rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 1.5rem;
 }
 
 .header-logo {
-  height: 56px;
+  height: 44px;
   width: auto;
   display: block;
+  flex-shrink: 0;
 }
 
 .header-sub {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--nz-ink);
-  line-height: 1.2;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--nz-ink-70);
 }
 
 .header-status {
@@ -102,26 +103,39 @@ main {
 }
 
 /* ── Keyframes ────────────────────────────────────────────────────────── */
-@keyframes gentle-blink {
-  0%, 49%, 100% { opacity: 1; }
-  50%, 99% { opacity: 0.4; }
+@keyframes cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 /* ── Input panel ──────────────────────────────────────────────────────── */
 .input-hint {
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--nz-ink);
-  padding: 0.5rem 0 0.75rem;
-  animation: gentle-blink 3s ease-in-out infinite;
+  background: var(--nz-green);
+  padding: 0.4rem 0.75rem;
   grid-column: 1;
   grid-row: 1;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
 }
 
-.input-panel { grid-column: 1; grid-row: 2; }
+.input-hint::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--nz-ink);
+  margin-left: 4px;
+  animation: cursor-blink 1s step-start infinite;
+}
 
-.output-panel { grid-column: 2; grid-row: 1 / 3; }
+.input-panel  { grid-column: 1; grid-row: 2; }
+
+.output-panel { grid-column: 2; grid-row: 2; }
 
 #input {
   flex: 1;
@@ -243,7 +257,7 @@ main {
 /* ── Controls bar ─────────────────────────────────────────────────────── */
 .controls {
   grid-column: 1 / 3;
-  grid-row: 4;
+  grid-row: 3;
   display: flex;
   gap: 1rem;
   align-items: center;
@@ -305,7 +319,7 @@ button:disabled {
 /* ── Stats & Legend ───────────────────────────────────────────────────── */
 .legend {
   grid-column: 1 / 3;
-  grid-row: 5;
+  grid-row: 4;
   display: flex;
   gap: 1.5rem;
   align-items: center;
@@ -394,12 +408,12 @@ footer {
     grid-template-columns: 1fr;
     padding: 1rem;
   }
-  .input-hint   { grid-column: 1; grid-row: auto; font-size: 1.1rem; }
+  .input-hint   { grid-column: 1; grid-row: auto; font-size: 1rem; }
   .input-panel  { grid-column: 1; grid-row: auto; }
   .output-panel { grid-column: 1; grid-row: auto; }
   .controls     { grid-column: 1; grid-row: auto; }
   .legend       { grid-column: 1; grid-row: auto; }
   #input, #output { min-height: 250px; }
-  .header-sub { font-size: 1.4rem; }
+  .header-sub { font-size: 0.8rem; }
   footer { margin-top: 2rem; padding: 2rem 1rem; }
 }
