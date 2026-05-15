@@ -1,0 +1,15 @@
+{
+  "name": "namescrub",
+  "version": "1.0.0",
+  "description": "Radikal lokale Web-App zur Anonymisierung deutscher Texte",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build-dictionary.js && vite build",
+    "preview": "vite preview",
+    "build:dict": "node scripts/build-dictionary.js"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
