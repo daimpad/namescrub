@@ -49,7 +49,7 @@ async function init() {
     return
   }
 
-  setStatus('Bereit. Text einfügen und Analyse starten.', 'ready')
+  setStatus('Text einfügen und Analyse starten.', 'ready')
   analyseBtn.disabled = false
 }
 
