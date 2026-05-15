@@ -51,7 +51,7 @@ header {
 }
 
 .header-logo {
-  height: 44px;
+  height: 64px;
   width: auto;
   display: block;
   flex-shrink: 0;
@@ -59,9 +59,9 @@ header {
 
 .header-sub {
   font-family: var(--font-body);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 400;
-  color: var(--nz-ink-70);
+  color: var(--nz-ink);
 }
 
 .header-status {
