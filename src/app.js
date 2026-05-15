@@ -40,9 +40,10 @@ async function init() {
   setStatus('Wörterbuch wird geladen…', 'loading')
   analyseBtn.disabled = true
 
-  const base = import.meta.env.BASE_URL
+  // Absolute URL berechnen — relative URLs im Worker lösen sich falsch auf
+  const dictUrl = new URL('dictionary.json', window.location.href).href
 
-  const res = await call('init', { base })
+  const res = await call('init', { dictUrl })
   if (!res.ok) {
     setStatus(`Fehler beim Laden des Wörterbuchs: ${res.error}`, 'error')
     return

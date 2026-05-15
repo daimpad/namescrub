@@ -8,9 +8,8 @@ const HONORIFICS = new Set(['herr', 'frau', 'dr', 'prof', 'sr', 'jr', 'mag', 'in
 /** Lazily loaded dictionary Set */
 let dict = null
 
-async function loadDictionary(base) {
-  const url = `${base}dictionary.json`
-  const res = await fetch(url)
+async function loadDictionary(dictUrl) {
+  const res = await fetch(dictUrl)
   if (!res.ok) throw new Error(`Dictionary fetch failed: ${res.status}`)
   const arr = await res.json()
   dict = new Set(arr)
@@ -116,7 +115,7 @@ self.onmessage = async (e) => {
 
   try {
     if (action === 'init') {
-      await loadDictionary(payload.base)
+      await loadDictionary(payload.dictUrl)
       self.postMessage({ id, ok: true })
     } else if (action === 'analyse') {
       if (!dict) throw new Error('Dictionary not loaded yet')
