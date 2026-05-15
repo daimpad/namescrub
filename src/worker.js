@@ -3,7 +3,25 @@
  * Runs off the main thread to keep UI responsive with large texts.
  */
 
-const HONORIFICS = new Set(['herr', 'frau', 'dr', 'prof', 'sr', 'jr', 'mag', 'ing', 'dipl'])
+const HONORIFICS = new Set([
+  // German titles
+  'herr', 'frau', 'fräulein',
+  'dr', 'prof', 'professor', 'professorin',
+  'doktor', 'doktorin',
+  'mag', 'ing', 'dipl',
+  'bsc', 'msc', 'mba', 'phd',
+  'sr', 'jr',
+  // Church / official
+  'pastor', 'pastorin', 'pfarrer', 'pfarrerin',
+  'bischof', 'kardinal', 'papst',
+  'senator', 'senatorin', 'minister', 'ministerin',
+  'präsident', 'präsidentin', 'direktor', 'direktorin',
+  'bürgermeister', 'bürgermeisterin', 'bundeskanzler', 'bundeskanzlerin',
+  // Military
+  'general', 'oberst', 'hauptmann', 'leutnant',
+  // Courtesy / nobility
+  'herren', 'damen', 'fürst', 'fürstin', 'graf', 'gräfin', 'baron', 'baronin',
+])
 
 /** Lazily loaded dictionary Set */
 let dict = null
@@ -27,6 +45,17 @@ function normalise(token) {
 }
 
 /**
+ * Return up to `limit` non-whitespace tokens before index (closest first).
+ */
+function prevWords(tokens, index, limit = 3) {
+  const words = []
+  for (let i = index - 1; i >= 0 && words.length < limit; i--) {
+    if (tokens[i].trim()) words.push(normalise(tokens[i]).toLowerCase())
+  }
+  return words
+}
+
+/**
  * Determine whether a raw token (with surrounding context) looks like a name.
  * Returns one of: 'name' | 'honorific-name' | 'word' | 'skip'
  */
@@ -43,17 +72,16 @@ function classify(token, index, tokens, sentenceStarts) {
   // Honorific itself is never a name
   if (HONORIFICS.has(lower)) return 'skip'
 
-  // Word after an honorific → high-priority name
-  if (index > 0) {
-    const prevClean = normalise(tokens[index - 1]).toLowerCase()
-    if (HONORIFICS.has(prevClean)) return 'honorific-name'
-  }
+  // Word preceded (within 3 non-space tokens) by an honorific → high-priority name.
+  // Looks back through chains like "Prof. Dr. Hans" or "Herr Dr. Müller".
+  const preceding = prevWords(tokens, index, 3)
+  if (preceding.some(w => HONORIFICS.has(w))) return 'honorific-name'
 
   // In-dictionary check
   if (dict.has(lower)) return 'word'
 
-  // Sentence-start: also try lowercase in dict (avoids false positives for
-  // capitalised common nouns at the start of sentences — German capitalises all nouns)
+  // Sentence-start: capitalised common nouns are normal in German — check dict with
+  // lowercase; if found it's just a noun, not a name.
   if (sentenceStarts.has(index)) {
     if (dict.has(lower)) return 'word'
     // Still not found → likely a proper noun even at sentence start
