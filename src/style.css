@@ -35,8 +35,8 @@ body {
 
 /* ── Header ───────────────────────────────────────────────────────────── */
 header {
-  background: var(--nz-ink);
-  color: var(--nz-paper);
+  background: var(--nz-paper);
+  color: var(--nz-ink);
   padding: 1rem 2rem;
   display: flex;
   align-items: center;
@@ -45,34 +45,26 @@ header {
   gap: 2rem;
 }
 
-.header-left { display: flex; align-items: baseline; }
-
-header h1 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 2rem;
-  letter-spacing: -0.02em;
-  color: var(--nz-paper);
-  line-height: 1;
+.header-left {
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1rem;
   flex-wrap: wrap;
 }
 
-header h1 mark {
-  background: var(--nz-green);
-  color: var(--nz-ink);
-  padding: 0 0.15em;
+.header-logo {
+  height: 48px;
+  max-height: 80px;
+  width: auto;
+  display: block;
 }
 
 .header-sub {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 400;
-  color: rgba(255,254,229,0.5);
-  letter-spacing: 0.08em;
-  text-transform: none;
+  color: var(--nz-ink-70);
+  letter-spacing: 0.06em;
 }
 
 .header-status {
@@ -81,15 +73,15 @@ header h1 mark {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,254,229,0.7);
+  color: var(--nz-ink-70);
   text-align: right;
   max-width: 380px;
 }
 
-.header-status.ready   { color: var(--nz-green); }
-.header-status.loading { color: rgba(255,254,229,0.6); }
-.header-status.error   { color: #ff6b6b; }
-.header-status.warn    { color: #FFD600; }
+.header-status.ready   { color: #00a86b; }
+.header-status.loading { color: var(--nz-ink-70); }
+.header-status.error   { color: #cc0000; }
+.header-status.warn    { color: #996600; }
 
 .status-hidden { display: none; }
 

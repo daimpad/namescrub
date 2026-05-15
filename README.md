@@ -1,6 +1,9 @@
-# NameScrub
-
-**Anonymisierung deutscher Texte — direkt im Browser.**
+<div align="center">
+  <img src="public/namescrub_logo_long.svg" alt="NameScrub" height="80" />
+  <br/><br/>
+  <strong>Anonymisierung deutscher Texte — direkt im Browser.</strong>
+</div>
+<br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black?style=flat-square)](LICENSE)
 [![Built with Vite](https://img.shields.io/badge/Built%20with-Vite-black?style=flat-square&logo=vite&logoColor=00FF9C)](https://vitejs.dev)
