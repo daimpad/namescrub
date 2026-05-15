@@ -45,11 +45,7 @@ header {
   gap: 2rem;
 }
 
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
+.header-left { display: flex; align-items: baseline; }
 
 header h1 {
   font-family: var(--font-display);
@@ -58,6 +54,10 @@ header h1 {
   letter-spacing: -0.02em;
   color: var(--nz-paper);
   line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 header h1 mark {
@@ -70,9 +70,9 @@ header h1 mark {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 400;
-  color: rgba(255,254,229,0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  color: rgba(255,254,229,0.5);
+  letter-spacing: 0.08em;
+  text-transform: none;
 }
 
 .header-status {
@@ -358,15 +358,16 @@ footer {
   letter-spacing: 0.1em;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 2rem;
   color: var(--nz-ink-70);
   background: var(--nz-paper);
-  gap: 1rem;
   flex-wrap: wrap;
 }
 
 .footer-links {
   display: flex;
+  align-items: center;
   gap: 1.5rem;
 }
 
@@ -375,17 +376,28 @@ footer {
   text-decoration: none;
   border-bottom: 2px solid var(--nz-ink);
   padding-bottom: 1px;
-  transition: color var(--nz-dur), border-color var(--nz-dur);
+  transition: border-color var(--nz-dur);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-.footer-links a:hover {
-  color: var(--nz-ink);
-  border-bottom-color: var(--nz-green);
-}
+.footer-links a:hover { border-bottom-color: var(--nz-green); }
+
+.footer-github { letter-spacing: 0; }
+.footer-github svg { flex-shrink: 0; }
 
 .footer-brand {
+  font-size: 0.58rem;
   color: var(--nz-ink-70);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--nz-dur);
 }
+
+.footer-brand:hover { border-bottom-color: var(--nz-ink-70); }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 800px) {
