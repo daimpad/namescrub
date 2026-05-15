@@ -41,7 +41,6 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: var(--nz-stroke);
   gap: 2rem;
 }
 
@@ -68,20 +67,8 @@ header {
 }
 
 .header-status {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--nz-ink-70);
-  text-align: right;
-  max-width: 380px;
+  display: none;
 }
-
-.header-status.ready   { color: #00a86b; }
-.header-status.loading { color: var(--nz-ink-70); }
-.header-status.error   { color: #cc0000; }
-.header-status.warn    { color: #996600; }
 
 .status-hidden { display: none; }
 
@@ -117,8 +104,25 @@ main {
   padding: 0.35rem 0.75rem;
 }
 
+/* ── Keyframes ────────────────────────────────────────────────────────── */
+@keyframes gentle-blink {
+  0%, 49%, 100% { opacity: 1; }
+  50%, 99% { opacity: 0.4; }
+}
+
 /* ── Input panel ──────────────────────────────────────────────────────── */
 .input-panel { grid-column: 1; grid-row: 1 / 3; }
+
+.input-hint {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--nz-ink);
+  padding: 1rem;
+  text-align: center;
+  animation: gentle-blink 3s ease-in-out infinite;
+}
 
 #input {
   flex: 1;
@@ -341,7 +345,6 @@ button:disabled {
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
 footer {
-  border-top: var(--nz-stroke);
   padding: 0.9rem 2rem;
   font-family: var(--font-mono);
   font-size: 0.65rem;
@@ -349,12 +352,11 @@ footer {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
   color: var(--nz-ink-70);
   background: var(--nz-paper);
-  flex-wrap: wrap;
 }
 
 .footer-links {
@@ -366,15 +368,11 @@ footer {
 .footer-links a {
   color: var(--nz-ink);
   text-decoration: none;
-  border-bottom: 2px solid var(--nz-ink);
-  padding-bottom: 1px;
-  transition: border-color var(--nz-dur);
   display: flex;
   align-items: center;
   gap: 0.35rem;
 }
 
-.footer-links a:hover { border-bottom-color: var(--nz-green); }
 
 .footer-github { letter-spacing: 0; }
 .footer-github svg { flex-shrink: 0; }
@@ -385,11 +383,7 @@ footer {
   text-decoration: none;
   letter-spacing: 0.06em;
   text-transform: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--nz-dur);
 }
-
-.footer-brand:hover { border-bottom-color: var(--nz-ink-70); }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 800px) {
