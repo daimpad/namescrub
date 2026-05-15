@@ -111,17 +111,23 @@ main {
 }
 
 /* ── Input panel ──────────────────────────────────────────────────────── */
-.input-panel { grid-column: 1; grid-row: 1 / 3; }
+.input-panel { grid-column: 1; grid-row: 1; }
+
+.output-panel { grid-column: 2; grid-row: 1; }
 
 .input-hint {
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 300;
-  font-style: italic;
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
   color: var(--nz-ink);
-  padding: 1rem;
+  padding: 2rem;
   text-align: center;
   animation: gentle-blink 3s ease-in-out infinite;
+  grid-column: 1 / 3;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #input {
@@ -143,7 +149,6 @@ main {
 #input::placeholder { color: var(--nz-ink-70); }
 
 /* ── Output panel ─────────────────────────────────────────────────────── */
-.output-panel { grid-column: 2; grid-row: 1 / 3; }
 
 #output {
   flex: 1;
@@ -245,6 +250,7 @@ main {
 /* ── Controls bar ─────────────────────────────────────────────────────── */
 .controls {
   grid-column: 1 / 3;
+  grid-row: 3;
   display: flex;
   gap: 1rem;
   align-items: center;
@@ -306,6 +312,7 @@ button:disabled {
 /* ── Stats & Legend ───────────────────────────────────────────────────── */
 .legend {
   grid-column: 1 / 3;
+  grid-row: 4;
   display: flex;
   gap: 1.5rem;
   align-items: center;
@@ -353,7 +360,8 @@ footer {
   letter-spacing: 0.1em;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 0.75rem;
   color: var(--nz-ink-70);
   background: var(--nz-paper);
@@ -362,6 +370,7 @@ footer {
 .footer-links {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 1.5rem;
 }
 

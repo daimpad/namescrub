@@ -6,11 +6,17 @@
   <meta name="description" content="NameScrub — Anonymisierung deutscher Texte. 100% lokal, keine Daten verlassen Ihren Browser." />
   <meta name="robots" content="index, follow" />
   <title>NameScrub — Texte lokal anonymisieren</title>
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="namescrub" />
+  <link rel="manifest" href="/site.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@700&family=Inter:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/main-D7Tq7ZFS.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-fqNxFuSk.css">
+  <script type="module" crossorigin src="./assets/main-BuX07klN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-YcKtTuvM.css">
 </head>
 <body>
 
@@ -26,7 +32,6 @@
 
   <div class="panel input-panel">
     <div class="panel-label">Eingabe</div>
-    <div class="input-hint" id="input-hint">Bereit. Text einfügen und Analyse starten.</div>
     <textarea
       id="input"
       placeholder="Deutschen Text hier einfügen…&#10;&#10;Tipp: Strg+Enter startet die Analyse."
@@ -39,6 +44,8 @@
     <div class="panel-label">Ergebnis — Namen anklicken für Optionen</div>
     <div id="output" aria-live="polite" aria-label="Analysierter Text"></div>
   </div>
+
+  <div class="input-hint" id="input-hint">Bereit. Text einfügen und Analyse starten.</div>
 
   <div class="controls">
     <span id="status" class="status-hidden" aria-live="polite"></span>
