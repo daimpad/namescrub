@@ -14,9 +14,11 @@
 <body>
 
 <header>
-  <h1>Name<mark>Scrub</mark></h1>
-  <span class="tagline">// Texte lokal anonymisieren</span>
-  <span class="privacy-badge">Zero-Server · Kein Tracking · Lokal</span>
+  <div class="header-left">
+    <h1>Name<mark>Scrub</mark></h1>
+    <span class="header-sub">Zero-Server · Kein Tracking · Lokal</span>
+  </div>
+  <span id="header-status" class="header-status">Wörterbuch wird geladen…</span>
 </header>
 
 <main>
@@ -37,7 +39,7 @@
   </div>
 
   <div class="controls">
-    <span id="status" class="status loading">Wörterbuch wird geladen…</span>
+    <span id="status" class="status-hidden" aria-live="polite"></span>
     <button id="btn-analyse" disabled>Analyse starten</button>
     <button id="btn-purge"   disabled>Alle ersetzen</button>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
@@ -59,8 +61,12 @@
 </main>
 
 <footer>
-  <span>NameScrub — Alle Daten bleiben in Ihrem Browser.</span>
-  <span>// Gute digitale Dienste.</span>
+  <nav class="footer-links">
+    <a href="https://nozilla.de/impressum" target="_blank" rel="noopener">Impressum</a>
+    <a href="https://nozilla.de/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
+    <a href="https://nozilla.de/kontakt" target="_blank" rel="noopener">Kontakt</a>
+  </nav>
+  <span class="footer-brand">nozilla | bits &amp; bytes mit ❤</span>
 </footer>
 
 <script type="module" src="/src/app.js"></script>

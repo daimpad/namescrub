@@ -31,7 +31,8 @@ const outputEl   = document.getElementById('output')
 const analyseBtn = document.getElementById('btn-analyse')
 const purgeBtn   = document.getElementById('btn-purge')
 const copyBtn    = document.getElementById('btn-copy')
-const statusEl   = document.getElementById('status')
+const statusEl      = document.getElementById('status')
+const headerStatusEl = document.getElementById('header-status')
 const statsEl    = document.getElementById('stats')
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -236,7 +237,8 @@ async function copyToClipboard() {
 
 function setStatus(msg, type = 'ready') {
   statusEl.textContent = msg
-  statusEl.className = `status ${type}`
+  headerStatusEl.textContent = msg
+  headerStatusEl.className = `header-status ${type}`
 }
 
 // ── Event listeners ────────────────────────────────────────────────────────
