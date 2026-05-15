@@ -21,7 +21,6 @@
 
 <main>
 
-  <!-- Input -->
   <div class="panel input-panel">
     <div class="panel-label">Eingabe</div>
     <textarea
@@ -32,41 +31,28 @@
     ></textarea>
   </div>
 
-  <!-- Output -->
   <div class="panel output-panel">
-    <div class="panel-label" id="output-label">Ergebnis — verdächtige Wörter anklicken zum Entfernen</div>
+    <div class="panel-label">Ergebnis — Namen anklicken für Optionen</div>
     <div id="output" aria-live="polite" aria-label="Analysierter Text"></div>
   </div>
 
-  <!-- Controls -->
   <div class="controls">
     <span id="status" class="status loading">Wörterbuch wird geladen…</span>
     <button id="btn-analyse" disabled>Analyse starten</button>
-
-    <!-- Modus-Toggle -->
-    <label class="mode-toggle-wrap" title="Wechsel zwischen Löschen und [ANONYMISIERT]-Ersatz">
-      <input type="checkbox" id="mode-toggle" />
-      <span class="mode-toggle-track">
-        <span class="mode-toggle-thumb"></span>
-      </span>
-      <span id="mode-label" class="mode-label">Löschen</span>
-    </label>
-
-    <button id="btn-purge"   disabled>Namen entfernen</button>
+    <button id="btn-purge"   disabled>Alle ersetzen</button>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
   </div>
 
-  <!-- Stats & Legend -->
   <div class="legend">
     <span id="stats"></span>
     <span class="legend-item">
-      <span class="legend-swatch name"></span> Möglicher Name
+      <span class="legend-swatch name"></span> Möglicher Name → klicken
     </span>
     <span class="legend-item">
       <span class="legend-swatch honorific"></span> Name nach Anrede
     </span>
     <span class="legend-item">
-      <span class="legend-swatch anonymised"></span> [ANONYMISIERT]
+      <span class="legend-swatch replaced"></span> Name-X ersetzt
     </span>
   </div>
 
@@ -74,7 +60,7 @@
 
 <footer>
   <span>NameScrub — Alle Daten bleiben in Ihrem Browser</span>
-  <span>Wörterbuch: davidak/wortliste (Open Source)</span>
+  <span>Wörterbuch: enz/german-wordlist (Open Source)</span>
 </footer>
 
 <script type="module" src="/src/app.js"></script>

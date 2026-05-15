@@ -144,9 +144,8 @@ main {
 }
 
 .token.name:hover {
-  background: var(--red);
-  color: var(--white);
-  text-decoration: line-through;
+  background: var(--yellow2);
+  outline: 2px solid var(--black);
 }
 
 .token.honorific {
@@ -155,65 +154,59 @@ main {
   box-shadow: 2px 2px 0 var(--black);
 }
 
-.token.anonymised {
+.token.replaced {
   background: var(--black);
   color: var(--yellow);
   font-weight: 900;
-  font-size: 0.8em;
-  padding: 1px 4px;
-  letter-spacing: 0.04em;
+  font-size: 0.85em;
+  padding: 1px 5px;
+  letter-spacing: 0.03em;
   display: inline;
   cursor: default;
+  font-family: var(--font);
 }
 
-/* ── Mode toggle ──────────────────────────────────────────────────────── */
-.mode-toggle-wrap {
+/* ── Name popup ───────────────────────────────────────────────────────── */
+.name-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  user-select: none;
+  gap: 0;
+  background: var(--white);
+  border: var(--border);
+  box-shadow: 4px 4px 0 var(--black);
   white-space: nowrap;
 }
 
-.mode-toggle-wrap input[type="checkbox"] { display: none; }
-
-.mode-toggle-track {
-  width: 2.8rem;
-  height: 1.4rem;
-  background: var(--white);
-  border: var(--border);
-  box-shadow: var(--shadow);
-  position: relative;
-  display: block;
-  transition: background 0.15s;
-}
-
-.mode-toggle-wrap input:checked + .mode-toggle-track { background: var(--yellow); }
-
-.mode-toggle-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 1rem;
-  height: 1rem;
-  background: var(--black);
-  transition: left 0.15s;
-  display: block;
-}
-
-.mode-toggle-wrap input:checked + .mode-toggle-track .mode-toggle-thumb {
-  left: calc(100% - 1rem - 2px);
-}
-
-.mode-label {
+.popup-btn {
   font-family: var(--font);
   font-weight: 900;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  min-width: 7rem;
+  letter-spacing: 0.04em;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.1s;
 }
+
+.popup-btn.delete {
+  background: var(--red);
+  color: var(--white);
+  border-right: var(--border);
+}
+
+.popup-btn.delete:hover { background: #b00; }
+
+.popup-btn.replace {
+  background: var(--yellow);
+  color: var(--black);
+}
+
+.popup-btn.replace:hover { background: var(--yellow2); }
 
 /* ── Controls bar ─────────────────────────────────────────────────────── */
 .controls {
@@ -324,9 +317,9 @@ button:disabled {
   display: inline-block;
 }
 
-.legend-swatch.name       { background: var(--yellow); }
-.legend-swatch.honorific  { background: var(--yellow2); box-shadow: 2px 2px 0 var(--black); }
-.legend-swatch.anonymised { background: var(--black); }
+.legend-swatch.name      { background: var(--yellow); }
+.legend-swatch.honorific { background: var(--yellow2); box-shadow: 2px 2px 0 var(--black); }
+.legend-swatch.replaced  { background: var(--black); }
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
 footer {
