@@ -110,13 +110,41 @@ function isAbbreviation(raw) {
  * Improvement 2: check dictionary including common German inflection suffixes.
  * Helps avoid marking inflected common nouns as names ("Häusers" → "Häuser").
  */
-const INFLECTION_SUFFIXES = ['ens', 'ern', 'ers', 'nen', 'em', 'en', 'er', 's']
+const INFLECTION_SUFFIXES = [
+  // Noun / adjective inflections
+  'ens', 'ern', 'ers', 'nen', 'em', 'en', 'er', 'es', 'e', 's',
+  // Adjective superlatives / comparatives
+  'sten', 'stem', 'ster', 'stes', 'ste',
+  // Common verb endings (helps with "-ung", "-keit", "-heit" derived nouns in inflected form)
+  'ung', 'ungen', 'keit', 'keiten', 'heit', 'heiten',
+]
 function inDict(lower) {
   if (dict.has(lower)) return true
   for (const s of INFLECTION_SUFFIXES) {
     if (lower.length - s.length >= 3 && lower.endsWith(s)) {
       if (dict.has(lower.slice(0, -s.length))) return true
     }
+  }
+  return false
+}
+
+/**
+ * German compound word detector. Splits the word at every position and
+ * checks if both halves are known words. Handles Fugen-s/n/e joining.
+ * Prevents false positives for unlisted compounds ("Nachmittagssonne").
+ */
+function isCompoundWord(lower) {
+  if (lower.length < 7) return false
+  for (let i = 3; i <= lower.length - 3; i++) {
+    const left = lower.slice(0, i)
+    const right = lower.slice(i)
+    if (inDict(left) && inDict(right)) return true
+    // Fugen-s: "Bundes|republik", "Jahres|bericht"
+    if (right.length >= 3 && right[0] === 's' && inDict(left) && inDict(right.slice(1))) return true
+    // Fugen-n: "Sonnen|schein", "Blumen|strauß"
+    if (right.length >= 3 && right[0] === 'n' && inDict(left) && inDict(right.slice(1))) return true
+    // Fugen-e: "Tag|es|licht" style intermediate
+    if (right.length >= 3 && right[0] === 'e' && inDict(left) && inDict(right.slice(1))) return true
   }
   return false
 }
@@ -178,7 +206,16 @@ function classify(token, index, tokens, sentenceStarts) {
     return 'word'
   }
 
-  // Starts with uppercase → candidate name
+  // Compound word detector: "Bundesverwaltungsgericht", "Nachmittagssonne" → word
+  if (isCompoundWord(lower)) return 'word'
+
+  // Sentence-start words that are unknown: default to word to avoid false positives.
+  // Names at sentence start are still caught via COMMON_SURNAMES (above) or
+  // honorific context (above), and via Pass 3 consistency if they also appear
+  // mid-sentence in the same text.
+  if (sentenceStarts.has(index)) return 'word'
+
+  // Mid-sentence uppercase word not in dict → name candidate
   if (startsUpper) return 'name'
 
   return 'word'
