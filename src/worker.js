@@ -50,6 +50,14 @@ const COMMON_SURNAMES = new Set([
 // these still get flagged (e.g. "Goldmann", "Rosenstein").
 const NAME_SUFFIX_RE = /(mann|stein|berg|thal|tal|feld|burg|hausen|dorf|beck|ow|ke|ki)$/i
 
+// Endings that are characteristic of German adjectives and adverbs — never names.
+// Covers -lich (freundlich), -isch (technisch), -ig (zuverlässig), -weise (erstaunlicherweise),
+// -haft (ernsthaft), -sam (langsam), -bar (verfügbar), -los (planlos), -voll (wertvoll),
+// -reich (erfolgreich), -arm (ressourcenarm), -mäßig (regelmäßig), -artig (eigenartig),
+// -fähig (arbeitsfähig), -würdig (vertrauenswürdig), -fertig (startfertig),
+// -wert (beachtenswert), -bereit (einsatzbereit).
+const WORD_SUFFIX_RE = /(lich|isch|haft|sam|bar|los|voll|reich|arm|weise|mäßig|artig|fähig|würdig|fertig|bereit|wert|ung|schaft|heit|keit|tum|nis|sal)$/i
+
 // German legal / organisational forms — never personal names.
 const LEGAL_FORMS = new Set([
   'gmbh', 'ag', 'kg', 'kgaa', 'ohg', 'gbr', 'ug', 'ev', 'se',
@@ -129,23 +137,51 @@ function inDict(lower) {
 }
 
 /**
- * German compound word detector. Splits the word at every position and
- * checks if both halves are known words. Handles Fugen-s/n/e joining.
- * Prevents false positives for unlisted compounds ("Nachmittagssonne").
+ * Normalise a potential compound segment: strip a single Fugen element
+ * (s, n, e) from the start and return the bare form, or the original.
+ * Used so both 2-part and 3-part compound checks can reuse the same logic.
+ */
+function stripFuge(s) {
+  if (s.length > 3 && (s[0] === 's' || s[0] === 'n' || s[0] === 'e')) return s.slice(1)
+  return s
+}
+
+/**
+ * German compound word detector.
+ * 2-part split:  "Nachmittags|sonne", "Bundes|republik"
+ * 3-part split:  "Bundes|verwaltungs|gericht", "Arbeits|unfall|versicherung"
+ * Handles Fugen-s/n/e at each join point.
+ * Minimum segment length 3 keeps noise low.
  */
 function isCompoundWord(lower) {
   if (lower.length < 7) return false
+
+  // ── 2-part ────────────────────────────────────────────────────────────
   for (let i = 3; i <= lower.length - 3; i++) {
     const left = lower.slice(0, i)
     const right = lower.slice(i)
     if (inDict(left) && inDict(right)) return true
-    // Fugen-s: "Bundes|republik", "Jahres|bericht"
-    if (right.length >= 3 && right[0] === 's' && inDict(left) && inDict(right.slice(1))) return true
-    // Fugen-n: "Sonnen|schein", "Blumen|strauß"
-    if (right.length >= 3 && right[0] === 'n' && inDict(left) && inDict(right.slice(1))) return true
-    // Fugen-e: "Tag|es|licht" style intermediate
-    if (right.length >= 3 && right[0] === 'e' && inDict(left) && inDict(right.slice(1))) return true
+    const rightBare = stripFuge(right)
+    if (rightBare !== right && rightBare.length >= 3 && inDict(left) && inDict(rightBare)) return true
   }
+
+  // ── 3-part (only for longer words to keep perf reasonable) ────────────
+  if (lower.length < 10) return false
+  for (let i = 3; i <= lower.length - 6; i++) {
+    const left = lower.slice(0, i)
+    if (!inDict(left)) continue          // prune: left part must be a word
+    const rest = lower.slice(i)
+    for (let j = 3; j <= rest.length - 3; j++) {
+      const mid = rest.slice(0, j)
+      const right = rest.slice(j)
+      const midBare = stripFuge(mid)
+      const rightBare = stripFuge(right)
+      if (inDict(midBare) && inDict(rightBare)) return true
+      if (midBare !== mid && inDict(midBare) && right.length >= 3 && inDict(right)) return true
+      if (rightBare !== right && inDict(mid) && rightBare.length >= 3 && inDict(rightBare)) return true
+    }
+  }
+
   return false
 }
 
@@ -205,6 +241,10 @@ function classify(token, index, tokens, sentenceStarts) {
     if (startsUpper && !sentenceStarts.has(index) && NAME_SUFFIX_RE.test(lower)) return 'name'
     return 'word'
   }
+
+  // Adjective / adverb suffix → definitively not a name
+  // (-lich, -isch, -ig, -haft, -sam, -bar, -los, -weise, -mäßig, …)
+  if (WORD_SUFFIX_RE.test(lower)) return 'word'
 
   // Compound word detector: "Bundesverwaltungsgericht", "Nachmittagssonne" → word
   if (isCompoundWord(lower)) return 'word'
