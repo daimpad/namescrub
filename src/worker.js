@@ -29,9 +29,8 @@ const PARTICLES = new Set([
   'ten', 'den', 'la', 'le', 'el', 'af', 'av', 'der',
 ])
 
-// Improvement 9: very common German surnames that also exist as dictionary
-// words (occupations, adjectives). Flagged as name candidates even when the
-// dict would return true, because in personal-text context they're names.
+// Very common German surnames that also exist as dictionary words (occupations,
+// adjectives). Flagged as name candidates even when the dict would return true.
 const COMMON_SURNAMES = new Set([
   'müller', 'schneider', 'fischer', 'meyer', 'weber', 'schulz', 'wagner',
   'becker', 'hoffmann', 'schäfer', 'koch', 'bauer', 'richter', 'klein',
@@ -45,17 +44,10 @@ const COMMON_SURNAMES = new Set([
   'engel', 'stern', 'sommer', 'graf', 'kurz', 'sauer', 'gross', 'groß',
 ])
 
-// Improvement 7: word endings strongly associated with German surnames.
-// Applied after the dict check so common-word stems that happen to end in
-// these still get flagged (e.g. "Goldmann", "Rosenstein").
+// Word endings strongly associated with German surnames.
 const NAME_SUFFIX_RE = /(mann|stein|berg|thal|tal|feld|burg|hausen|dorf|beck|ow|ke|ki)$/i
 
-// Endings that are characteristic of German adjectives and adverbs — never names.
-// Covers -lich (freundlich), -isch (technisch), -ig (zuverlässig), -weise (erstaunlicherweise),
-// -haft (ernsthaft), -sam (langsam), -bar (verfügbar), -los (planlos), -voll (wertvoll),
-// -reich (erfolgreich), -arm (ressourcenarm), -mäßig (regelmäßig), -artig (eigenartig),
-// -fähig (arbeitsfähig), -würdig (vertrauenswürdig), -fertig (startfertig),
-// -wert (beachtenswert), -bereit (einsatzbereit).
+// Endings characteristic of German adjectives and adverbs — never names.
 const WORD_SUFFIX_RE = /(lich|isch|haft|sam|bar|los|voll|reich|arm|weise|mäßig|artig|fähig|würdig|fertig|bereit|wert|ung|schaft|heit|keit|tum|nis|sal)$/i
 
 // German legal / organisational forms — never personal names.
@@ -65,27 +57,64 @@ const LEGAL_FORMS = new Set([
 ])
 
 // Abbreviations that end in "." but are NOT sentence boundaries.
-// Used in findSentenceStarts to avoid false sentence splits.
 const SENT_ABBREV = new Set([
-  // Honorifics (without trailing dot — normalised below)
   'dr', 'prof', 'hr', 'fr', 'sr', 'jr', 'mag', 'ing', 'dipl',
-  // Common German abbreviations
   'nr', 'str', 'tel', 'fax', 'abs', 'art', 'abb', 'ca', 'ggf',
   'inkl', 'exkl', 'evtl', 'zzgl', 'mwst', 'bsp', 'vgl', 'usw',
   'bzw', 'etc', 'zb', 'dh', 'ua', 'oa', 'ff', 'ibd',
-  // Months
   'jan', 'feb', 'mär', 'mar', 'apr', 'jun', 'jul',
   'aug', 'sep', 'sept', 'okt', 'nov', 'dez',
 ])
 
-/** Lazily loaded dictionary Set */
+// Common German 3rd-person-singular verb forms. A capitalised word directly
+// before one of these is very likely a sentence subject = a name.
+const VERB_FORMS = new Set([
+  // Auxiliaries / modals (highest frequency)
+  'ist','war','sei','wäre','hat','hatte','hätte','wird','wurde','würde',
+  'kann','konnte','könnte','muss','musste','müsste','soll','sollte',
+  'darf','durfte','dürfte','mag','mochte','möchte','will','wollte',
+  // Movement / state
+  'geht','kommt','läuft','fährt','fliegt','reist','zieht','bleibt',
+  'steht','sitzt','liegt','wohnt','lebt','stirbt',
+  // Communication
+  'sagt','spricht','erklärt','berichtet','schreibt','liest','fragt',
+  'antwortet','ruft','postet','tweetet','teilt','veröffentlicht',
+  // Cognition
+  'denkt','glaubt','weiß','kennt','versteht','meint','findet','sieht',
+  'hört','erinnert','ahnt','hofft','befürchtet',
+  // Action
+  'macht','tut','arbeitet','hilft','kämpft','sucht','nimmt','gibt',
+  'bringt','trägt','hält','lässt','stellt','setzt','legt','zeigt',
+  'öffnet','schließt','beginnt','endet','startet','stoppt','wartet',
+  'kauft','verkauft','zahlt','besitzt','gehört','betreibt',
+  'trifft','besucht','empfängt','begrüßt','schläft','isst','trinkt',
+  'spielt','singt','tanzt','lernt','übt','trainiert',
+  // Professional
+  'leitet','führt','studiert','lehrt','forscht','entwickelt','plant',
+  'entscheidet','beschließt','verhandelt','fordert','kritisiert',
+  'unterstützt','vertritt','übernimmt','verantwortet','präsentiert',
+  // Life events
+  'heiratet','bekommt','erhält','verliert','gewinnt','erreicht','scheitert','feiert',
+])
+
+/** Lazily loaded data */
 let dict = null
+let firstNames = null
 
 async function loadDictionary(dictUrl) {
   const res = await fetch(dictUrl)
   if (!res.ok) throw new Error(`Dictionary fetch failed: ${res.status}`)
-  const arr = await res.json()
-  dict = new Set(arr)
+  dict = new Set(await res.json())
+}
+
+async function loadFirstNames(namesUrl) {
+  try {
+    const res = await fetch(namesUrl)
+    if (!res.ok) return
+    firstNames = new Set(await res.json())
+  } catch {
+    // Non-critical — degrade gracefully without first-names support
+  }
 }
 
 /**
@@ -99,31 +128,24 @@ function normalise(token) {
 }
 
 /**
- * Improvement 4: abbreviation detection.
- * Covers all-caps (AG, USA), mixed-case org forms (GmbH, KGaA),
+ * Abbreviation detection: all-caps (AG, USA), mixed-case org forms (GmbH, KGaA),
  * and dot-separated abbreviations (e.V., z.B.).
  */
 function isAbbreviation(raw) {
   const nodots = raw.replace(/\./g, '')
   if (nodots.length < 2 || nodots.length > 7) return false
-  // All uppercase/digit: AG, USA, VW, NATO
   if (/^[A-ZÄÖÜ0-9]+$/.test(nodots)) return true
-  // Mixed-case with at least 2 uppercase letters: GmbH, KGaA, GbR
   const uppers = (nodots.match(/[A-ZÄÖÜ]/g) || []).length
   if (uppers >= 2 && nodots.length <= 6) return true
   return false
 }
 
 /**
- * Improvement 2: check dictionary including common German inflection suffixes.
- * Helps avoid marking inflected common nouns as names ("Häusers" → "Häuser").
+ * Dictionary lookup with German inflection suffix stripping.
  */
 const INFLECTION_SUFFIXES = [
-  // Noun / adjective inflections
   'ens', 'ern', 'ers', 'nen', 'em', 'en', 'er', 'es', 'e', 's',
-  // Adjective superlatives / comparatives
   'sten', 'stem', 'ster', 'stes', 'ste',
-  // Common verb endings (helps with "-ung", "-keit", "-heit" derived nouns in inflected form)
   'ung', 'ungen', 'keit', 'keiten', 'heit', 'heiten',
 ]
 function inDict(lower) {
@@ -137,9 +159,7 @@ function inDict(lower) {
 }
 
 /**
- * Normalise a potential compound segment: strip a single Fugen element
- * (s, n, e) from the start and return the bare form, or the original.
- * Used so both 2-part and 3-part compound checks can reuse the same logic.
+ * Strip a single Fugen element (s/n/e) from the start of a compound segment.
  */
 function stripFuge(s) {
   if (s.length > 3 && (s[0] === 's' || s[0] === 'n' || s[0] === 'e')) return s.slice(1)
@@ -148,15 +168,12 @@ function stripFuge(s) {
 
 /**
  * German compound word detector.
- * 2-part split:  "Nachmittags|sonne", "Bundes|republik"
- * 3-part split:  "Bundes|verwaltungs|gericht", "Arbeits|unfall|versicherung"
- * Handles Fugen-s/n/e at each join point.
- * Minimum segment length 3 keeps noise low.
+ * 2-part:  "Nachmittags|sonne", "Bundes|republik"
+ * 3-part:  "Bundes|verwaltungs|gericht", "Arbeits|unfall|versicherung"
  */
 function isCompoundWord(lower) {
   if (lower.length < 7) return false
 
-  // ── 2-part ────────────────────────────────────────────────────────────
   for (let i = 3; i <= lower.length - 3; i++) {
     const left = lower.slice(0, i)
     const right = lower.slice(i)
@@ -165,11 +182,10 @@ function isCompoundWord(lower) {
     if (rightBare !== right && rightBare.length >= 3 && inDict(left) && inDict(rightBare)) return true
   }
 
-  // ── 3-part (only for longer words to keep perf reasonable) ────────────
   if (lower.length < 10) return false
   for (let i = 3; i <= lower.length - 6; i++) {
     const left = lower.slice(0, i)
-    if (!inDict(left)) continue          // prune: left part must be a word
+    if (!inDict(left)) continue
     const rest = lower.slice(i)
     for (let j = 3; j <= rest.length - 3; j++) {
       const mid = rest.slice(0, j)
@@ -186,11 +202,10 @@ function isCompoundWord(lower) {
 }
 
 /**
- * Return up to `limit` non-whitespace tokens before index (closest first),
- * skipping through PARTICLES so honorific context is preserved across them.
- * E.g. "Herr von Müller" → prevWords("Müller") still finds "herr".
+ * Return up to `limit` non-whitespace tokens before index (closest first).
+ * Limit raised to 8 to handle long title chains like "Prof. Dr. med. Dr. h.c. mult. Name".
  */
-function prevWords(tokens, index, limit = 5) {
+function prevWords(tokens, index, limit = 8) {
   const words = []
   for (let i = index - 1; i >= 0 && words.length < limit; i--) {
     if (!tokens[i].trim()) continue
@@ -212,50 +227,54 @@ function classify(token, index, tokens, sentenceStarts) {
 
   const lower = clean.toLowerCase()
 
-  // Honorific itself → skip, not a name
   if (HONORIFICS.has(lower)) return 'skip'
-
-  // Particle → skip (transparent, handled in chaining passes)
   if (PARTICLES.has(lower)) return 'skip'
-
-  // Legal / org form → skip (GmbH, AG, e.V. …)
   if (LEGAL_FORMS.has(lower)) return 'skip'
-
-  // Improvement 4: abbreviation → skip (all-caps, mixed-caps short tokens)
   if (isAbbreviation(clean)) return 'skip'
 
-  // Word after an honorific (searching back through particles and whitespace)
-  const preceding = prevWords(tokens, index, 5)
+  // Word after an honorific — limit raised to 8 for multi-title chains
+  const preceding = prevWords(tokens, index, 8)
   if (preceding.some(w => HONORIFICS.has(w))) return 'honorific-name'
 
   const firstLetter = token.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
   const startsUpper = /^[A-ZÄÖÜ]$/.test(firstLetter)
 
-  // Improvement 9: known surname overrides dict — "Müller" mid-sentence is a name
+  // Positive first-name match — strong signal regardless of dictionary
+  if (firstNames && firstNames.has(lower) && startsUpper) return 'name'
+
+  // Known surname overrides dict
   if (COMMON_SURNAMES.has(lower) && startsUpper) return 'name'
 
-  // Dictionary check (improvement 2: with suffix stripping)
+  // Hyphenated names: Hans-Peter, Karl-Heinz, Marie-Louise, Anna-Lena.
+  // Both parts must start uppercase, consist only of letters, and neither
+  // part may be a common dictionary word (rules out Ex-Minister, E-Mail …).
+  if (token.includes('-')) {
+    const parts = token.split('-')
+    if (
+      parts.length === 2 &&
+      parts.every(p => /^[A-ZÄÖÜ][a-zäöüß]{1,}$/.test(p.trim())) &&
+      parts.every(p => !inDict(p.trim().toLowerCase()))
+    ) return 'name'
+  }
+
+  // Dictionary check with inflection stripping
   if (inDict(lower)) {
-    // Improvement 7: word in dict but ends with a name-typical suffix and starts
-    // uppercase mid-sentence → likely a surname (e.g. "Goldmann", "Rosenstein")
     if (startsUpper && !sentenceStarts.has(index) && NAME_SUFFIX_RE.test(lower)) return 'name'
     return 'word'
   }
 
   // Adjective / adverb suffix → definitively not a name
-  // (-lich, -isch, -ig, -haft, -sam, -bar, -los, -weise, -mäßig, …)
   if (WORD_SUFFIX_RE.test(lower)) return 'word'
 
-  // Compound word detector: "Bundesverwaltungsgericht", "Nachmittagssonne" → word
+  // Compound word → not a name
   if (isCompoundWord(lower)) return 'word'
 
-  // Sentence-start words that are unknown: default to word to avoid false positives.
-  // Names at sentence start are still caught via COMMON_SURNAMES (above) or
-  // honorific context (above), and via Pass 3 consistency if they also appear
-  // mid-sentence in the same text.
+  // Unknown word at sentence start → conservative default to avoid false positives.
+  // Sentence-initial names are caught via firstNames/COMMON_SURNAMES above, or
+  // via Pass 3 consistency (if they also appear mid-sentence) or Pass 5 (verb context).
   if (sentenceStarts.has(index)) return 'word'
 
-  // Mid-sentence uppercase word not in dict → name candidate
+  // Mid-sentence unknown uppercase word → name candidate
   if (startsUpper) return 'name'
 
   return 'word'
@@ -270,21 +289,18 @@ function tokenise(text) {
 
 /**
  * Identify token indices that start a new sentence.
- * Skips abbreviation periods: "Dr.", "Nr.", "Jan." are not sentence ends.
  */
 function findSentenceStarts(tokens) {
   const starts = new Set()
   starts.add(0)
   for (let i = 0; i < tokens.length; i++) {
     if (!/[.!?…]\s*$/.test(tokens[i])) continue
-    // Treat "!" and "?" always as sentence ends; for "." check if abbreviation
     if (/[!?…]\s*$/.test(tokens[i])) {
       for (let j = i + 1; j < tokens.length; j++) {
         if (tokens[j].trim()) { starts.add(j); break }
       }
       continue
     }
-    // "." — only a sentence end if the token is not a known abbreviation
     const stem = tokens[i].trim().toLowerCase().replace(/\.+$/, '')
     if (SENT_ABBREV.has(stem) || HONORIFICS.has(stem)) continue
     for (let j = i + 1; j < tokens.length; j++) {
@@ -296,7 +312,6 @@ function findSentenceStarts(tokens) {
 
 /**
  * Find the index of the next non-space, non-particle token after `from`.
- * Returns -1 if none found within `maxSkip` tokens.
  */
 function nextContentToken(result, from, maxSkip = 3) {
   let skipped = 0
@@ -320,9 +335,6 @@ function analyse(text) {
   })
 
   // ── Pass 2: name-chaining ─────────────────────────────────────────────
-  // A word immediately following a recognised name gets promoted if it
-  // starts with uppercase — covers "Vorname Nachname" patterns and
-  // nobility chains like "Herr von Müller".
   for (let i = 0; i < result.length; i++) {
     const t = result[i]
     if (t.type !== 'name' && t.type !== 'honorific-name') continue
@@ -337,19 +349,14 @@ function analyse(text) {
     const clean = normalise(raw)
     const firstLetter = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
 
-    // Only promote if it starts with uppercase (surname, not a verb/article)
     if (!/^[A-ZÄÖÜ]$/.test(firstLetter)) continue
 
-    // After a confirmed honorific-name: promote regardless of dictionary
-    // After a regular name: only promote if not a dictionary word (avoids
-    // turning "Hans Haus" into two names)
     if (t.type === 'honorific-name' || !inDict(clean.toLowerCase())) {
       result[j] = { ...candidate, type: 'name' }
     }
   }
 
   // ── Pass 3: consistency propagation ──────────────────────────────────
-  // Collect all confirmed name keys (min 3 chars to avoid noise)
   const nameKeys = new Set()
   for (const tok of result) {
     if (tok.type === 'name' || tok.type === 'honorific-name') {
@@ -358,22 +365,16 @@ function analyse(text) {
     }
   }
 
-  // Re-classify any 'word' token whose normalised form is a known name
   if (nameKeys.size > 0) {
     for (let i = 0; i < result.length; i++) {
       if (result[i].type === 'word') {
         const key = normalise(result[i].text).toLowerCase()
-        if (nameKeys.has(key)) {
-          result[i] = { ...result[i], type: 'name' }
-        }
+        if (nameKeys.has(key)) result[i] = { ...result[i], type: 'name' }
       }
     }
   }
 
   // ── Pass 4: bilateral context (look forward) ──────────────────────────
-  // Improvement 11: a 'word' that starts with uppercase and is NOT in the
-  // dictionary, immediately preceding a confirmed name, is very likely a
-  // first name whose base form happened to be a dict word — promote it.
   for (let i = 0; i < result.length; i++) {
     if (result[i].type !== 'word') continue
     const raw = result[i].text
@@ -381,12 +382,33 @@ function analyse(text) {
     const lower = clean.toLowerCase()
     const fl = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
     if (!/^[A-ZÄÖÜ]$/.test(fl)) continue
-    if (inDict(lower)) continue   // genuine dict word → skip
+    if (inDict(lower)) continue
 
-    // Find the next non-space, non-particle content token
     const j = nextContentToken(result, i, 1)
     if (j === -1) continue
     if (result[j].type === 'name' || result[j].type === 'honorific-name') {
+      result[i] = { ...result[i], type: 'name' }
+    }
+  }
+
+  // ── Pass 5: verb context ──────────────────────────────────────────────
+  // A 'word' token that starts uppercase and is directly followed by a
+  // known 3rd-person-singular verb is very likely a sentence subject = name.
+  // This recovers names at sentence start that were held back by the
+  // sentence-start guard ("Damian schreibt den Brief.").
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type !== 'word') continue
+    const raw = result[i].text
+    const fl = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
+    if (!/^[A-ZÄÖÜ]$/.test(fl)) continue
+
+    const lower = normalise(raw).toLowerCase()
+    if (inDict(lower) || WORD_SUFFIX_RE.test(lower)) continue   // definitely a word
+
+    const j = nextContentToken(result, i, 1)
+    if (j === -1) continue
+    const nextLower = normalise(result[j].text).toLowerCase()
+    if (VERB_FORMS.has(nextLower)) {
       result[i] = { ...result[i], type: 'name' }
     }
   }
@@ -399,6 +421,7 @@ self.onmessage = async (e) => {
   try {
     if (action === 'init') {
       await loadDictionary(payload.dictUrl)
+      if (payload.namesUrl) await loadFirstNames(payload.namesUrl)
       self.postMessage({ id, ok: true })
     } else if (action === 'analyse') {
       if (!dict) throw new Error('Dictionary not loaded yet')

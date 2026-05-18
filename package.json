@@ -8,10 +8,11 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build-dictionary.js && vite build",
-    "build:plesk": "node scripts/build-dictionary.js && vite build",
+    "build": "node scripts/build-dictionary.js && node scripts/build-firstnames.js && vite build",
+    "build:plesk": "node scripts/build-dictionary.js && node scripts/build-firstnames.js && vite build",
     "preview": "vite preview",
-    "build:dict": "node scripts/build-dictionary.js"
+    "build:dict": "node scripts/build-dictionary.js",
+    "build:names": "node scripts/build-firstnames.js"
   },
   "devDependencies": {
     "vite": "^5.4.0"

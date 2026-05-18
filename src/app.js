@@ -43,7 +43,8 @@ async function init() {
   analyseBtn.disabled = true
 
   const dictUrl = new URL('dictionary.json', window.location.href).href
-  const res = await call('init', { dictUrl })
+  const namesUrl = new URL('firstnames.json', window.location.href).href
+  const res = await call('init', { dictUrl, namesUrl })
   if (!res.ok) {
     setStatus(`Fehler beim Laden des Wörterbuchs: ${res.error}`, 'error')
     return
