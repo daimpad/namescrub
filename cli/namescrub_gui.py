@@ -13,7 +13,11 @@ from pathlib import Path
 
 # Pfad zum CLI-Modul (gleicher Ordner wie diese Datei)
 _HERE = Path(__file__).parent
+_ROOT = _HERE.parent
 sys.path.insert(0, str(_HERE))
+
+# Logo-Pfad (public/namescrub_logo_header.png, relativ zum Repo-Root)
+_LOGO_PATH = _ROOT / "public" / "namescrub_logo_header.png"
 
 try:
     from namescrub import load_model, anonymise, apply_mapping, interactive_review, LABEL_PREFIX
@@ -58,10 +62,26 @@ class NameScrubApp:
         # ── Header ──────────────────────────────────────────────────────────
         header = tk.Frame(self.root, bg=INK, pady=8)
         header.pack(fill=tk.X)
-        tk.Label(
-            header, text="NameScrub", font=TITLE_F,
-            bg=INK, fg=GREEN, padx=16,
-        ).pack(side=tk.LEFT)
+
+        # Logo-PNG laden (Tkinter unterstützt PNG nativ ab Tk 8.6)
+        self._logo_img = None
+        if _LOGO_PATH.exists():
+            try:
+                self._logo_img = tk.PhotoImage(file=str(_LOGO_PATH))
+                tk.Label(
+                    header, image=self._logo_img,
+                    bg=INK, padx=16, pady=2,
+                ).pack(side=tk.LEFT)
+            except Exception:
+                self._logo_img = None
+
+        if not self._logo_img:
+            # Fallback: Textlogo
+            tk.Label(
+                header, text="NameScrub", font=TITLE_F,
+                bg=INK, fg=GREEN, padx=16,
+            ).pack(side=tk.LEFT)
+
         tk.Label(
             header, text="Text rein. Sensible Daten raus.",
             font=SANS, bg=INK, fg=WHITE, padx=0,
