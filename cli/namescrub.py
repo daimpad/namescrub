@@ -181,6 +181,58 @@ def interactive_review(doc, entity_types: tuple) -> dict:
     print()
     return mapping
 
+# ── Einzeldatei verarbeiten ────────────────────────────────────────────────────
+
+def process_file(path: Path, nlp, entity_types: tuple, args) -> dict:
+    """Liest, anonymisiert und schreibt eine einzelne Datei. Gibt mapping zurück."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"  ✗ {path.name}: {e}", file=sys.stderr)
+        return {}
+
+    if not text.strip():
+        print(f"  – {path.name}: leer, übersprungen", file=sys.stderr)
+        return {}
+
+    doc = nlp(text)
+
+    if args.list:
+        seen = set()
+        print(f"\n── {path.name} ──")
+        for ent in doc.ents:
+            if ent.label_ not in entity_types or ent.text in seen:
+                continue
+            seen.add(ent.text)
+            print(f"  [{ent.label_:4}]  {ent.text}")
+        return {}
+
+    result, mapping = anonymise(text, nlp, entity_types)
+    return result, mapping, doc
+
+
+def write_result(result: str, src_path: Path, output_arg: str | None) -> Path:
+    """
+    Bestimmt den Ausgabepfad:
+    - -o verzeichnis/  → verzeichnis/dateiname.txt
+    - -o datei.txt     → datei.txt  (nur bei Einzeldatei sinnvoll)
+    - kein -o          → stdout
+    """
+    if not output_arg:
+        print(result)
+        return None
+
+    out = Path(output_arg)
+    if out.is_dir() or output_arg.endswith("/") or output_arg.endswith("\\"):
+        out.mkdir(parents=True, exist_ok=True)
+        out = out / src_path.name
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+    out.write_text(result, encoding="utf-8")
+    return out
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 def main():
@@ -192,19 +244,21 @@ def main():
             "Beispiele:\n"
             "  namescrub.py bericht.txt\n"
             "  namescrub.py bericht.txt -o anonym.txt\n"
-            "  namescrub.py bericht.txt -e PER,ORG,LOC\n"
+            "  namescrub.py *.txt -o ausgabe/\n"
+            "  namescrub.py docs/*.txt -o anonym/ -e PER,ORG,LOC\n"
             "  namescrub.py bericht.txt --interactive\n"
             "  cat text.txt | namescrub.py\n"
         ),
     )
 
     parser.add_argument(
-        "input", nargs="?",
-        help="Eingabedatei (Standard: stdin)",
+        "input", nargs="*",
+        help="Eingabedatei(en) (Standard: stdin). Glob-Muster möglich: *.txt",
     )
     parser.add_argument(
         "-o", "--output",
-        help="Ausgabedatei (Standard: stdout)",
+        help="Ausgabedatei oder -verzeichnis (Standard: stdout). "
+             "Bei mehreren Eingaben muss ein Verzeichnis angegeben werden.",
     )
     parser.add_argument(
         "-e", "--entities", default="PER",
@@ -212,7 +266,7 @@ def main():
     )
     parser.add_argument(
         "-i", "--interactive", action="store_true",
-        help="Jede Entität interaktiv bestätigen",
+        help="Jede Entität interaktiv bestätigen (nur bei Einzeldatei)",
     )
     parser.add_argument(
         "--list", action="store_true",
@@ -230,58 +284,124 @@ def main():
     args = parser.parse_args()
     entity_types = tuple(e.strip().upper() for e in args.entities.split(","))
 
-    # ── Text lesen ─────────────────────────────────────────────────────────────
-    if args.input:
-        try:
-            text = Path(args.input).read_text(encoding="utf-8")
-        except FileNotFoundError:
-            sys.exit(f"Fehler: Datei nicht gefunden: {args.input}")
-    else:
-        text = sys.stdin.read()
-
-    if not text.strip():
-        sys.exit("Fehler: Kein Text eingegeben.")
-
     # ── Modell laden ───────────────────────────────────────────────────────────
     print("Modell wird geladen…", file=sys.stderr, end="\r", flush=True)
     nlp = load_model(args.model)
     print(" " * 25,           file=sys.stderr, end="\r", flush=True)
 
-    # ── Analyse ────────────────────────────────────────────────────────────────
-    doc = nlp(text)
+    # ── Eingabe: stdin oder Datei(en) ──────────────────────────────────────────
+    if not args.input:
+        # stdin-Modus
+        text = sys.stdin.read()
+        if not text.strip():
+            sys.exit("Fehler: Kein Text eingegeben.")
+        doc = nlp(text)
 
-    if args.list:
-        seen = set()
-        print(f"\n── Erkannte Entitäten ({', '.join(entity_types)}) ──\n")
-        for ent in doc.ents:
-            if ent.label_ not in entity_types or ent.text in seen:
-                continue
-            seen.add(ent.text)
-            print(f"  [{ent.label_:4}]  {ent.text}")
-        print()
+        if args.list:
+            seen = set()
+            print(f"\n── Erkannte Entitäten ({', '.join(entity_types)}) ──\n")
+            for ent in doc.ents:
+                if ent.label_ not in entity_types or ent.text in seen:
+                    continue
+                seen.add(ent.text)
+                print(f"  [{ent.label_:4}]  {ent.text}")
+            print()
+            return
+
+        if args.interactive:
+            mapping = interactive_review(doc, entity_types)
+            result  = apply_mapping(text, doc, mapping, entity_types)
+        else:
+            result, mapping = anonymise(text, nlp, entity_types)
+
+        write_result(result, Path("output.txt"), args.output)
+        _print_summary(mapping, bool(args.output), args.no_summary)
         return
 
-    if args.interactive:
-        mapping = interactive_review(doc, entity_types)
-        result  = apply_mapping(text, doc, mapping, entity_types)
-    else:
-        result, mapping = anonymise(text, nlp, entity_types)
+    # ── Batch-Modus: eine oder mehrere Dateien ─────────────────────────────────
+    # Glob-Expansion (Shell erledigt das meist, aber Windows braucht manuelles Glob)
+    import glob as _glob
+    paths = []
+    for pattern in args.input:
+        expanded = _glob.glob(pattern, recursive=True)
+        if expanded:
+            paths.extend(Path(p) for p in expanded)
+        else:
+            paths.append(Path(pattern))   # wird später als FileNotFoundError behandelt
 
-    # ── Ausgabe ────────────────────────────────────────────────────────────────
-    if args.output:
-        Path(args.output).write_text(result, encoding="utf-8")
-        print(f"✓ Anonymisiert → {args.output}", file=sys.stderr)
-    else:
-        print(result)
+    if len(paths) > 1 and args.output and not (
+        args.output.endswith("/") or args.output.endswith("\\") or Path(args.output).is_dir()
+    ):
+        sys.exit(
+            "Fehler: Bei mehreren Eingabedateien muss -o ein Verzeichnis sein.\n"
+            f"  Tipp: -o {args.output}/"
+        )
 
-    # ── Zusammenfassung ────────────────────────────────────────────────────────
-    if mapping and not args.no_summary:
-        dest = sys.stderr if args.output else sys.stdout
-        print(f"\n── {len(mapping)} Entität(en) ersetzt ──", file=dest)
-        for placeholder in sorted(set(mapping.values())):
-            originals = [k for k, v in mapping.items() if v == placeholder]
-            print(f"  {placeholder:12}  {', '.join(originals)}", file=dest)
-        print(file=dest)
+    total_entities = 0
+    ok = 0
+
+    for i, path in enumerate(paths, 1):
+        prefix = f"[{i}/{len(paths)}]" if len(paths) > 1 else ""
+
+        if not path.exists():
+            print(f"  ✗ {path}: nicht gefunden", file=sys.stderr)
+            continue
+
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception as e:
+            print(f"  ✗ {path.name}: {e}", file=sys.stderr)
+            continue
+
+        if not text.strip():
+            print(f"  – {path.name}: leer, übersprungen", file=sys.stderr)
+            continue
+
+        doc = nlp(text)
+
+        if args.list:
+            seen = set()
+            print(f"\n── {path.name} ──")
+            for ent in doc.ents:
+                if ent.label_ not in entity_types or ent.text in seen:
+                    continue
+                seen.add(ent.text)
+                print(f"  [{ent.label_:4}]  {ent.text}")
+            continue
+
+        if args.interactive and len(paths) == 1:
+            mapping = interactive_review(doc, entity_types)
+            result  = apply_mapping(text, doc, mapping, entity_types)
+        else:
+            result, mapping = anonymise(text, nlp, entity_types)
+
+        out_path = write_result(result, path, args.output)
+        total_entities += len(mapping)
+        ok += 1
+
+        if out_path:
+            n = len(mapping)
+            print(f"  ✓ {prefix} {path.name} → {out_path.name}  ({n} Entität{'en' if n != 1 else ''})", file=sys.stderr)
+            if not args.no_summary and mapping:
+                for placeholder in sorted(set(mapping.values())):
+                    originals = [k for k, v in mapping.items() if v == placeholder]
+                    print(f"      {placeholder:12}  {', '.join(originals)}", file=sys.stderr)
+        else:
+            _print_summary(mapping, False, args.no_summary)
+
+    if len(paths) > 1:
+        print(f"\n── {ok}/{len(paths)} Dateien verarbeitet, {total_entities} Entitäten ersetzt ──\n", file=sys.stderr)
+
+
+def _print_summary(mapping: dict, to_stderr: bool, no_summary: bool):
+    if not mapping or no_summary:
+        return
+    dest = sys.stderr if to_stderr else sys.stdout
+    print(f"\n── {len(mapping)} Entität(en) ersetzt ──", file=dest)
+    for placeholder in sorted(set(mapping.values())):
+        originals = [k for k, v in mapping.items() if v == placeholder]
+        print(f"  {placeholder:12}  {', '.join(originals)}", file=dest)
+    print(file=dest)
 
 
 if __name__ == "__main__":
