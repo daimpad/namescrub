@@ -1,0 +1,5 @@
+spacy>=3.5.0
+# Deutsches NER-Modell (einmalig installieren):
+#   python -m spacy download de_core_news_lg   ← empfohlen (~560 MB, beste Genauigkeit)
+#   python -m spacy download de_core_news_md   ← Alternative (~45 MB, etwas weniger genau)
+#   python -m spacy download de_core_news_sm   ← Minimal (~15 MB, für Tests)
