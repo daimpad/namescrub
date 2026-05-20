@@ -36,6 +36,44 @@ body {
 /* ── Header ───────────────────────────────────────────────────────────── */
 header {
   background: var(--nz-paper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+}
+
+.header-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* NameScrub+ Download-Button im Header */
+.btn-plus {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: var(--nz-stroke);
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  background: var(--nz-ink);
+  color: var(--nz-green);
+  box-shadow: var(--nz-shadow-sm);
+  transition: transform var(--nz-dur), box-shadow var(--nz-dur);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+}
+.btn-plus:hover { background: #222; }
+.btn-plus:active { transform: translate(3px,3px); box-shadow: none; }
+
+.plus-badge {
+  color: var(--nz-green);
+  font-size: 1.1em;
+  line-height: 1;
 }
 
 .header-inner,
@@ -416,4 +454,231 @@ footer {
   #input, #output { min-height: 250px; }
   .header-sub { font-size: 0.8rem; }
   footer { margin-top: 2rem; padding: 2rem 1rem; }
+  .btn-plus { font-size: 0.62rem; padding: 0.45rem 0.7rem; }
+}
+
+/* ── NameScrub+ Modal ──────────────────────────────────────────────────── */
+.plus-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plus-modal[hidden] { display: none; }
+
+.plus-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  cursor: pointer;
+}
+
+.plus-modal-box {
+  position: relative;
+  background: var(--nz-paper);
+  border: var(--nz-stroke);
+  box-shadow: 10px 10px 0 0 #000;
+  max-width: 680px;
+  width: calc(100% - 2rem);
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.plus-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  box-shadow: none;
+  color: var(--nz-ink);
+  line-height: 1;
+}
+.plus-modal-close:hover { background: var(--nz-ink); color: var(--nz-paper); }
+.plus-modal-close:active { transform: none; }
+
+.plus-modal-header {
+  background: var(--nz-ink);
+  padding: 1.5rem 2rem 1.25rem;
+}
+
+.plus-modal-logo {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--nz-green);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.plus-modal-tagline {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.85);
+  margin: 0;
+}
+
+.plus-modal-body {
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.plus-section p {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--nz-ink);
+  margin-bottom: 0.6rem;
+}
+
+.plus-section-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--nz-ink);
+  color: var(--nz-paper);
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Vergleichs-Tabelle */
+.plus-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  border: var(--nz-stroke);
+}
+
+.plus-compare-col {
+  padding: 1rem 1.1rem;
+}
+
+.plus-compare-col--plus {
+  background: var(--nz-green);
+  border-left: var(--nz-stroke);
+}
+
+.plus-compare-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.plus-compare-tag {
+  font-size: 0.6rem;
+  background: var(--nz-ink-20);
+  padding: 0.1rem 0.4rem;
+}
+
+.plus-compare-tag--plus {
+  background: var(--nz-ink);
+  color: var(--nz-green);
+}
+
+.plus-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.plus-list li {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding-left: 1.1em;
+  position: relative;
+}
+
+.plus-list li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--nz-ink-70);
+  font-size: 0.75em;
+}
+
+.plus-code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--nz-ink);
+  color: var(--nz-green);
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+  white-space: pre;
+  overflow-x: auto;
+  border: none;
+}
+
+/* Footer mit Download-Button */
+.plus-modal-footer {
+  border-top: var(--nz-stroke);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-plus-download {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--nz-green);
+  color: var(--nz-ink);
+  border: var(--nz-stroke);
+  padding: 0.75rem 1.4rem;
+  cursor: pointer;
+  box-shadow: var(--nz-shadow-sm);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform var(--nz-dur), box-shadow var(--nz-dur), background var(--nz-dur);
+}
+
+.btn-plus-download:hover { background: var(--nz-green-strong); }
+.btn-plus-download:active { transform: translate(3px,3px); box-shadow: none; }
+
+.plus-github-link {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--nz-ink);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.plus-github-link:hover { text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .plus-modal-box { max-height: 100vh; border-left: none; border-right: none; }
+  .plus-compare   { grid-template-columns: 1fr; }
+  .plus-compare-col--plus { border-left: none; border-top: var(--nz-stroke); }
+  .plus-modal-body { padding: 1.25rem 1rem; }
+  .plus-modal-header { padding: 1.25rem 1rem; }
+  .plus-modal-footer { padding: 1rem; }
 }
