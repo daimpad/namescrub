@@ -44,8 +44,8 @@ jobs:
 
       - name: Build executable
         run: python cli/build_exe.py
-        # Modell wird bewusst NICHT heruntergeladen (~560 MB)
-        # Die App erkennt beim Start ob das Modell fehlt und zeigt eine Anleitung
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Rename artifact (Unix)
         if: matrix.os != 'windows-latest'

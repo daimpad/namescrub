@@ -85,7 +85,7 @@ def main():
 
     if exe.exists():
         size_mb = sum(f.stat().st_size for f in exe.rglob("*") if f.is_file()) / 1024 / 1024
-        print(f"\n✓ Build erfolgreich: {exe}  ({size_mb:.0f} MB)")
+        print(f"\nBuild erfolgreich: {exe}  ({size_mb:.0f} MB)")
         print("\nHinweis: Beim ersten Start muss das spaCy-Modell installiert sein:")
         print("  pip install spacy")
         print("  python -m spacy download de_core_news_lg")
