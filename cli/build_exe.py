@@ -46,14 +46,6 @@ def main():
     except ImportError:
         sys.exit("spaCy nicht installiert — pip install spacy")
 
-    icon_arg = []
-    if sys.platform == "win32":
-        icon_file = ROOT / "public" / "favicon.ico"   # Windows braucht .ico
-    else:
-        icon_file = ROOT / "public" / "favicon-96x96.png"
-    if icon_file.exists():
-        icon_arg = ["--icon", str(icon_file)]
-
     # Modell-Daten nur einbetten wenn lokal installiert (CI baut ohne Modell)
     model_args = []
     try:
@@ -78,7 +70,6 @@ def main():
         "--collect-data", "spacy",
         "--hidden-import", "spacy.lang.de",
         *model_args,
-        *icon_arg,
         str(HERE / "namescrub_gui.py"),
     ]
 
