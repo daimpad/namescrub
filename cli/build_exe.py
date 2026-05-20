@@ -47,9 +47,12 @@ def main():
         sys.exit("spaCy nicht installiert — pip install spacy")
 
     icon_arg = []
-    icon_win = ROOT / "public" / "favicon-96x96.png"
-    if icon_win.exists():
-        icon_arg = ["--icon", str(icon_win)]
+    if sys.platform == "win32":
+        icon_file = ROOT / "public" / "favicon.ico"   # Windows braucht .ico
+    else:
+        icon_file = ROOT / "public" / "favicon-96x96.png"
+    if icon_file.exists():
+        icon_arg = ["--icon", str(icon_file)]
 
     # Modell-Daten nur einbetten wenn lokal installiert (CI baut ohne Modell)
     model_args = []
