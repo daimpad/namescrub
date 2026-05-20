@@ -24,8 +24,81 @@
     <img src="./public/namescrub_logo_long.svg" alt="NameScrub" class="header-logo" />
     <span class="header-sub">Text rein. Sensible Daten raus.</span>
   </div>
+  <div class="header-right">
+    <button id="btn-plus-open" class="btn-plus">NameScrub<span class="plus-badge">+</span> herunterladen</button>
+  </div>
   <span id="header-status" class="header-status"></span>
 </header>
+
+<!-- ── NameScrub+ Modal ──────────────────────────────────────────────── -->
+<div id="plus-modal" class="plus-modal" role="dialog" aria-modal="true" aria-labelledby="plus-modal-title" hidden>
+  <div class="plus-modal-backdrop"></div>
+  <div class="plus-modal-box">
+
+    <button class="plus-modal-close" id="btn-plus-close" aria-label="Schließen">✕</button>
+
+    <div class="plus-modal-header">
+      <span class="plus-modal-logo">NameScrub<span class="plus-badge">+</span></span>
+      <p class="plus-modal-tagline">Maximale Genauigkeit. Komplett lokal. Kein Browser.</p>
+    </div>
+
+    <div class="plus-modal-body">
+
+      <div class="plus-section">
+        <h3 class="plus-section-title">Wie es funktioniert</h3>
+        <p>NameScrub+ ist eine Desktop-App, die anstelle von Wörterbuch-Heuristiken ein trainiertes KI-Modell einsetzt — <strong>spaCy de_core_news_lg</strong>, ein deutsches Named-Entity-Recognition-Modell, das auf echten Texten trainiert wurde. Es versteht Grammatik und Kontext, statt Wörter nur durch Ausschlussverfahren zu klassifizieren.</p>
+        <p>Die Verarbeitung findet zu 100&nbsp;% auf deinem Rechner statt — kein Server, keine API, kein Netzwerk.</p>
+      </div>
+
+      <div class="plus-compare">
+        <div class="plus-compare-col">
+          <div class="plus-compare-label">NameScrub <span class="plus-compare-tag">Web</span></div>
+          <ul class="plus-list">
+            <li>Regelbasiert — Wörterbuch + Heuristiken</li>
+            <li>Sofort im Browser, kein Install</li>
+            <li>~9,5 MB Wörterbuch</li>
+            <li>Interaktive Einzel-Token-Bearbeitung</li>
+            <li>Nur Texteingabe</li>
+          </ul>
+        </div>
+        <div class="plus-compare-col plus-compare-col--plus">
+          <div class="plus-compare-label">NameScrub<span class="plus-badge">+</span> <span class="plus-compare-tag plus-compare-tag--plus">Desktop</span></div>
+          <ul class="plus-list">
+            <li>KI-basiert — trainiertes NER-Modell</li>
+            <li>Deutlich geringere Fehlerrate</li>
+            <li>Erkennt Personen, Orte &amp; Organisationen</li>
+            <li>Batch-Verarbeitung ganzer Ordner</li>
+            <li>Dateien per Klick öffnen &amp; speichern</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="plus-section">
+        <h3 class="plus-section-title">Voraussetzungen</h3>
+        <p>Python 3.9+ muss installiert sein. Das KI-Modell (~560&nbsp;MB) wird einmalig heruntergeladen.</p>
+        <pre class="plus-code">pip install spacy
+python -m spacy download de_core_news_lg
+python namescrub_gui.py</pre>
+      </div>
+
+    </div>
+
+    <div class="plus-modal-footer">
+      <a
+        href="https://github.com/daimpad/namescrub/archive/refs/heads/main.zip"
+        class="btn-plus-download"
+        download
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-7 2h14v2H5v-2z"/></svg>
+        NameScrub+ herunterladen
+      </a>
+      <a href="https://github.com/daimpad/namescrub" target="_blank" rel="noopener" class="plus-github-link">
+        Auf GitHub ansehen →
+      </a>
+    </div>
+
+  </div>
+</div>
 
 <main>
 

@@ -242,6 +242,33 @@ function setStatus(msg, type = 'ready') {
   inputHintEl.textContent = msg
 }
 
+// ── NameScrub+ Modal ───────────────────────────────────────────────────────
+
+const plusModal    = document.getElementById('plus-modal')
+const btnPlusOpen  = document.getElementById('btn-plus-open')
+const btnPlusClose = document.getElementById('btn-plus-close')
+const plusBackdrop = plusModal?.querySelector('.plus-modal-backdrop')
+
+function openPlusModal() {
+  plusModal.hidden = false
+  document.body.style.overflow = 'hidden'
+  btnPlusClose.focus()
+}
+
+function closePlusModal() {
+  plusModal.hidden = true
+  document.body.style.overflow = ''
+  btnPlusOpen.focus()
+}
+
+btnPlusOpen?.addEventListener('click', openPlusModal)
+btnPlusClose?.addEventListener('click', closePlusModal)
+plusBackdrop?.addEventListener('click', closePlusModal)
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && plusModal && !plusModal.hidden) closePlusModal()
+})
+
 // ── Event listeners ────────────────────────────────────────────────────────
 
 analyseBtn.addEventListener('click', analyse)
