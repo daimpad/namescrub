@@ -2,3 +2,7 @@ node_modules/
 .DS_Store
 *.local
 *.zip
+__pycache__/
+*.pyc
+cli/dist/
+cli/build/
