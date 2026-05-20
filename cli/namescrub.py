@@ -13,6 +13,7 @@ Schnellstart:
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -105,6 +106,22 @@ def _inherit_placeholder(key: str, mapping: dict) -> str | None:
     return None
 
 
+def _partial_mapping(mapping: dict) -> dict:
+    """
+    Leitet für jede Wortkomponente eines Mehrwort-Eintrags den Platzhalter ab,
+    sofern die Komponente nicht bereits direkt in mapping steht.
+    Z.B. {'thomas müller': 'Name-1'} → {'thomas': 'Name-1', 'müller': 'Name-1'}
+    """
+    partials = {}
+    for key, placeholder in mapping.items():
+        if " " not in key:
+            continue
+        for part in key.split():
+            if part not in mapping and part not in partials:
+                partials[part] = placeholder
+    return partials
+
+
 def apply_mapping(text: str, doc, mapping: dict, entity_types: tuple) -> str:
     """Ersetzt alle Entitäten im Originaltext anhand der Zuordnung."""
     parts = []
@@ -121,13 +138,40 @@ def apply_mapping(text: str, doc, mapping: dict, entity_types: tuple) -> str:
         cursor = ent.end_char
 
     parts.append(text[cursor:])
-    return "".join(parts)
+    result = "".join(parts)
+
+    # Second pass: replace name components spaCy missed without full-name context
+    # (e.g. standalone "Schneider" after "Thomas Schneider" was already replaced).
+    # Always derive from multi-word entries so the set is correct even if partials
+    # were already merged into mapping by anonymise().
+    partials = {}
+    for key, placeholder in mapping.items():
+        if " " not in key:
+            continue
+        for part in key.split():
+            if part not in partials:
+                partials[part] = placeholder
+
+    if not partials:
+        return result
+
+    pattern = r'\b(' + '|'.join(re.escape(p) for p in partials) + r')\b'
+
+    def _sub(m):
+        word = m.group(1)
+        if word[0].isupper():           # only replace capitalised occurrences
+            return partials[word.lower()]
+        return word
+
+    return re.sub(pattern, _sub, result, flags=re.IGNORECASE)
 
 
 def anonymise(text: str, nlp, entity_types: tuple) -> tuple[str, dict]:
     """Vollständige Anonymisierung; gibt (anonymisierter_text, mapping) zurück."""
     doc = nlp(text)
     mapping = build_mapping(doc, entity_types)
+    # Add partial-name entries so the summary reflects every replacement made
+    mapping.update({k: v for k, v in _partial_mapping(mapping).items() if k not in mapping})
     result  = apply_mapping(text, doc, mapping, entity_types)
     return result, mapping
 
