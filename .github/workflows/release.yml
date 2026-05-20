@@ -40,7 +40,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install spacy pyinstaller
+        run: pip install spacy pyinstaller Pillow
 
       - name: Build executable
         run: python cli/build_exe.py
