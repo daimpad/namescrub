@@ -43,7 +43,6 @@ def main():
     # spaCy-Hooks-Pfad ermitteln (nötig damit spaCy korrekt gebundelt wird)
     try:
         import spacy
-        spacy_path = Path(spacy.__file__).parent
     except ImportError:
         sys.exit("spaCy nicht installiert — pip install spacy")
 
@@ -52,19 +51,30 @@ def main():
     if icon_win.exists():
         icon_arg = ["--icon", str(icon_win)]
 
+    # Modell-Daten nur einbetten wenn lokal installiert (CI baut ohne Modell)
+    model_args = []
+    try:
+        import importlib
+        importlib.import_module("de_core_news_lg")
+        model_args = ["--collect-data", "de_core_news_lg",
+                      "--hidden-import", "de_core_news_lg"]
+        print("Modell de_core_news_lg gefunden — wird eingebettet.")
+    except ImportError:
+        print("Modell de_core_news_lg nicht gefunden — wird nicht eingebettet.")
+        print("Nutzer müssen es nach der Installation einmalig laden:")
+        print("  python -m spacy download de_core_news_lg")
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", "NameScrub",
-        "--onefile",            # alles in eine einzige Datei
+        "--onefile",
         "--windowed",           # kein Konsolenfenster (Windows/macOS)
         "--clean",
         "--distpath", str(DIST),
         "--workpath", str(BUILD),
-        # spaCy braucht seine Daten-Ordner
         "--collect-data", "spacy",
-        "--collect-data", "de_core_news_lg",
         "--hidden-import", "spacy.lang.de",
-        "--hidden-import", "de_core_news_lg",
+        *model_args,
         *icon_arg,
         str(HERE / "namescrub_gui.py"),
     ]

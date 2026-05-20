@@ -1,0 +1,108 @@
+name: Build & Release NameScrub+
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: NameScrub.exe
+            asset_name: NameScrub-windows.exe
+          - os: ubuntu-latest
+            artifact: NameScrub
+            asset_name: NameScrub-linux
+          - os: macos-latest
+            artifact: NameScrub
+            asset_name: NameScrub-macos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install spacy pyinstaller
+
+      - name: Build executable
+        run: python cli/build_exe.py
+        # Modell wird bewusst NICHT heruntergeladen (~560 MB)
+        # Die App erkennt beim Start ob das Modell fehlt und zeigt eine Anleitung
+
+      - name: Rename artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        run: mv cli/dist/NameScrub cli/dist/${{ matrix.asset_name }}
+
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Rename-Item cli/dist/NameScrub.exe ${{ matrix.asset_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: cli/dist/${{ matrix.asset_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NameScrub+ ${{ github.ref_name }}
+          body: |
+            ## NameScrub+ ${{ github.ref_name }}
+
+            Desktop-App für maximale Anonymisierungsgenauigkeit — KI-basiert mit spaCy NER, 100% lokal.
+
+            ### Installation
+
+            1. Datei für dein Betriebssystem herunterladen
+            2. Beim ersten Start einmalig das KI-Modell installieren:
+            ```
+            pip install spacy
+            python -m spacy download de_core_news_lg
+            ```
+            3. App starten — fertig.
+
+            ### Downloads
+
+            | Betriebssystem | Datei |
+            |---|---|
+            | Windows | `NameScrub-windows.exe` |
+            | macOS | `NameScrub-macos` |
+            | Linux | `NameScrub-linux` |
+
+            > Die App benötigt Python + spaCy auf deinem Rechner (kein Cloud-Dienst, alles lokal).
+
+            ---
+            **NameScrub Web** (ohne Installation): [namescrub.nozilla.net](https://namescrub.nozilla.net)
+          files: |
+            artifacts/NameScrub-windows.exe/NameScrub-windows.exe
+            artifacts/NameScrub-linux/NameScrub-linux
+            artifacts/NameScrub-macos/NameScrub-macos
+          draft: false
+          prerelease: false
