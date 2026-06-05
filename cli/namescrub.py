@@ -122,6 +122,61 @@ def _partial_mapping(mapping: dict) -> dict:
     return partials
 
 
+# Honorifike / Anreden auf Deutsch — für den regelbasierten Fallback-Pass.
+HONORIFICS_DE = (
+    'herr', 'frau', 'fräulein',
+    'dr', 'prof', 'professor', 'professorin', 'doktor', 'doktorin',
+    'mag', 'ing', 'dipl', 'bsc', 'msc', 'mba', 'phd', 'sen', 'jr',
+    'direktor', 'direktorin', 'präsident', 'präsidentin',
+    'minister', 'ministerin', 'senator', 'senatorin',
+    'bürgermeister', 'bürgermeisterin', 'bundeskanzler', 'bundeskanzlerin',
+    'general', 'oberst', 'hauptmann', 'leutnant',
+    'pastor', 'pastorin', 'pfarrer', 'pfarrerin', 'bischof', 'kardinal',
+    'fürst', 'fürstin', 'graf', 'gräfin', 'baron', 'baronin',
+)
+
+
+def _honorifik_pass(text: str, mapping: dict, entity_types: tuple) -> dict:
+    """
+    Regelbasierter Fallback für 'Frau Müller'- / 'Herr Dr. Schmidt'-Muster,
+    die spaCy ohne Vornamen-Kontext nicht als PER-Entität markiert.
+    Gibt neue name→placeholder-Einträge zurück (ohne mapping zu verändern).
+    """
+    if 'PER' not in entity_types:
+        return {}
+
+    hon_pat = '|'.join(re.escape(h) for h in sorted(HONORIFICS_DE, key=len, reverse=True))
+    # (?i:...) scoped flag: case-insensitive for honorifics only; name part stays
+    # case-sensitive so [A-ZÄÖÜ] correctly requires an uppercase first letter.
+    full_pattern = (
+        r'(?:(?i:' + hon_pat + r')\.?\s+)+'  # ein oder mehrere Honorifike (case-insensitive)
+        r'([A-ZÄÖÜ][a-zäöüß]+'               # erster Namensteil (Großbuchstabe erforderlich)
+        r'(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*)'       # optionale weitere Teile
+    )
+
+    # Höchsten bestehenden Name-N-Zähler ermitteln
+    current_max = 0
+    for v in mapping.values():
+        m = re.match(r'Name-(\d+)$', v)
+        if m:
+            current_max = max(current_max, int(m.group(1)))
+    counter = current_max
+
+    honorifics_set = set(HONORIFICS_DE)
+    new_entries: dict = {}
+    for m in re.finditer(full_pattern, text):   # kein IGNORECASE – wird per (?i:...) gesteuert
+        name_text = m.group(1)
+        key = name_text.strip().lower()
+        # Backtracking kann Honorifike oder Kürzel als Namen einfangen — herausfiltern.
+        if key in honorifics_set or len(key) <= 2:
+            continue
+        if key not in mapping and key not in new_entries:
+            counter += 1
+            new_entries[key] = f'Name-{counter}'
+
+    return new_entries
+
+
 def apply_mapping(text: str, doc, mapping: dict, entity_types: tuple) -> str:
     """Ersetzt alle Entitäten im Originaltext anhand der Zuordnung."""
     parts = []
@@ -140,27 +195,30 @@ def apply_mapping(text: str, doc, mapping: dict, entity_types: tuple) -> str:
     parts.append(text[cursor:])
     result = "".join(parts)
 
-    # Second pass: replace name components spaCy missed without full-name context
-    # (e.g. standalone "Schneider" after "Thomas Schneider" was already replaced).
-    # Always derive from multi-word entries so the set is correct even if partials
-    # were already merged into mapping by anonymise().
-    partials = {}
+    # Second pass: replace all remaining single-word entries (honorifik fallback,
+    # inherited short names) AND partial components of multi-word entries.
+    # Longer keys first to avoid partial substring matches.
+    candidates: dict = {}
     for key, placeholder in mapping.items():
-        if " " not in key:
-            continue
-        for part in key.split():
-            if part not in partials:
-                partials[part] = placeholder
+        if ' ' not in key:
+            if key not in candidates:
+                candidates[key] = placeholder
+        else:
+            for part in key.split():
+                if part not in candidates:
+                    candidates[part] = placeholder
 
-    if not partials:
+    if not candidates:
         return result
 
-    pattern = r'\b(' + '|'.join(re.escape(p) for p in partials) + r')\b'
+    pattern = r'\b(' + '|'.join(
+        re.escape(k) for k in sorted(candidates, key=len, reverse=True)
+    ) + r')\b'
 
     def _sub(m):
         word = m.group(1)
-        if word[0].isupper():           # only replace capitalised occurrences
-            return partials[word.lower()]
+        if word[0].isupper():
+            return candidates.get(word.lower(), word)
         return word
 
     return re.sub(pattern, _sub, result, flags=re.IGNORECASE)
@@ -170,7 +228,9 @@ def anonymise(text: str, nlp, entity_types: tuple) -> tuple[str, dict]:
     """Vollständige Anonymisierung; gibt (anonymisierter_text, mapping) zurück."""
     doc = nlp(text)
     mapping = build_mapping(doc, entity_types)
-    # Add partial-name entries so the summary reflects every replacement made
+    # Honorifik-Fallback: 'Frau Müller'-Muster die spaCy alleine nicht erkennt
+    mapping.update({k: v for k, v in _honorifik_pass(text, mapping, entity_types).items() if k not in mapping})
+    # Teilnamen-Einträge für die Zusammenfassung
     mapping.update({k: v for k, v in _partial_mapping(mapping).items() if k not in mapping})
     result  = apply_mapping(text, doc, mapping, entity_types)
     return result, mapping

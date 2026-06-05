@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@700&family=Inter:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/main-Db5slD9h.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-KojUPqQU.css">
+  <script type="module" crossorigin src="./assets/main-CSpLL59y.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-BocAqq2m.css">
 </head>
 <body>
 
@@ -117,7 +117,7 @@ python namescrub_gui.py</pre>
   </div>
 
   <div class="panel output-panel">
-    <div class="panel-label">Ergebnis — Namen anklicken für Optionen</div>
+    <div class="panel-label">Ergebnis — Markierungen anklicken für Optionen</div>
     <div id="output" aria-live="polite" aria-label="Analysierter Text"></div>
   </div>
 
@@ -125,19 +125,31 @@ python namescrub_gui.py</pre>
     <span id="status" class="status-hidden" aria-live="polite"></span>
     <button id="btn-analyse" disabled>Analyse starten</button>
     <button id="btn-purge"   disabled>Alle ersetzen</button>
+    <label class="opt-label" title="Datumsangaben wie 12.03.2024 erkennen und anonymisieren">
+      <input type="checkbox" id="opt-dates"> Datumsangaben
+    </label>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
   </div>
 
   <div class="legend">
     <span id="stats"></span>
     <span class="legend-item">
-      <span class="legend-swatch name"></span> Möglicher Name → klicken
+      <span class="legend-swatch name"></span> Name → klicken
     </span>
     <span class="legend-item">
       <span class="legend-swatch honorific"></span> Name nach Anrede
     </span>
     <span class="legend-item">
-      <span class="legend-swatch replaced"></span> Name-X ersetzt
+      <span class="legend-swatch email"></span> E-Mail → klicken
+    </span>
+    <span class="legend-item">
+      <span class="legend-swatch phone"></span> Telefon → klicken
+    </span>
+    <span class="legend-item" id="legend-date" hidden>
+      <span class="legend-swatch date"></span> Datum → klicken
+    </span>
+    <span class="legend-item">
+      <span class="legend-swatch replaced"></span> Ersetzt
     </span>
   </div>
 
