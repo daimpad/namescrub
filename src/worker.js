@@ -97,6 +97,62 @@ const VERB_FORMS = new Set([
   'heiratet','bekommt','erhält','verliert','gewinnt','erreicht','scheitert','feiert',
 ])
 
+// ── Special-token pre-processing ─────────────────────────────────────────
+
+/**
+ * Scan `text` for emails, phone numbers and (optionally) dates before normal
+ * tokenisation. Replaces each match with a null-byte marker so the 5-pass
+ * algorithm never sees those characters; the originals are stored in a map
+ * and restored in Pass 1.
+ */
+function preProcess(text, options) {
+  const items = []  // {start, end, type, original}
+
+  // E-Mail addresses
+  const emailRe = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
+  let m
+  while ((m = emailRe.exec(text)) !== null) {
+    items.push({ start: m.index, end: m.index + m[0].length, type: 'email', original: m[0] })
+  }
+
+  // Phone numbers — international (+49/0049) and common German local (0XX/XXXXX)
+  const phoneRe = /(?:\+49|0049)[\s()\-]*[\d][\d\s()\-]{4,20}|(?<!\d)0[1-9]\d{1,4}[\s\/\-]\d{3,8}(?!\d)/g
+  while ((m = phoneRe.exec(text)) !== null) {
+    items.push({ start: m.index, end: m.index + m[0].length, type: 'phone', original: m[0].trim() })
+  }
+
+  // Dates — only when checkbox is active
+  if (options && options.detectDates) {
+    const dateRe = /\b\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4}\b/g
+    while ((m = dateRe.exec(text)) !== null) {
+      items.push({ start: m.index, end: m.index + m[0].length, type: 'date', original: m[0] })
+    }
+  }
+
+  // Sort by position; drop overlapping ranges
+  items.sort((a, b) => a.start - b.start)
+  const noOverlap = []
+  let lastEnd = 0
+  for (const it of items) {
+    if (it.start >= lastEnd) { noOverlap.push(it); lastEnd = it.end }
+  }
+
+  // Build modified text with unique null-byte markers
+  const markerMap = new Map()
+  let processed = ''
+  let pos = 0
+  noOverlap.forEach((it, idx) => {
+    processed += text.slice(pos, it.start)
+    const marker = `\x00NSP${idx}\x00`
+    markerMap.set(marker, { type: it.type, original: it.original })
+    processed += marker
+    pos = it.end
+  })
+  processed += text.slice(pos)
+
+  return { processed, markerMap }
+}
+
 /** Lazily loaded data */
 let dict = null
 let firstNames = null
@@ -324,13 +380,16 @@ function nextContentToken(result, from, maxSkip = 3) {
   return -1
 }
 
-function analyse(text) {
-  const tokens = tokenise(text)
+function analyse(text, options) {
+  const { processed, markerMap } = preProcess(text, options)
+  const tokens = tokenise(processed)
   const sentenceStarts = findSentenceStarts(tokens)
 
   // ── Pass 1: base classification ───────────────────────────────────────
   const result = tokens.map((token, i) => {
     if (/^\s+$/.test(token)) return { text: token, type: 'space' }
+    const special = markerMap.get(token)
+    if (special) return { text: special.original, type: special.type }
     return { text: token, type: classify(token, i, tokens, sentenceStarts) }
   })
 
@@ -343,7 +402,10 @@ function analyse(text) {
     if (j === -1) continue
 
     const candidate = result[j]
-    if (candidate.type === 'space' || candidate.type === 'honorific-name' || candidate.type === 'name') continue
+    // Never chain across special tokens (email/phone/date)
+    if (candidate.type === 'space' || candidate.type === 'honorific-name' ||
+        candidate.type === 'name' || candidate.type === 'email' ||
+        candidate.type === 'phone' || candidate.type === 'date') continue
 
     const raw = candidate.text
     const clean = normalise(raw)
@@ -425,7 +487,7 @@ self.onmessage = async (e) => {
       self.postMessage({ id, ok: true })
     } else if (action === 'analyse') {
       if (!dict) throw new Error('Dictionary not loaded yet')
-      const tokens = analyse(payload.text)
+      const tokens = analyse(payload.text, payload.options)
       self.postMessage({ id, ok: true, tokens })
     } else {
       throw new Error(`Unknown action: ${action}`)
