@@ -10,6 +10,8 @@ const TEST_DICT = new Set([
   'brief', 'haus', 'auto', 'geld', 'zeit', 'tag', 'nacht', 'welt', 'land',
   'schule', 'arbeit', 'firma', 'bank', 'stadt', 'straße', 'leer', 'steht',
   'meldete', 'rekordgewinn', 'trafen', 'sich', 'berichtete',
+  // Words that happen to also be dict entries — must not spread as names via Pass 3
+  'sommer', 'winter', 'vogel', 'firma',
 ])
 
 const TEST_NAMES = new Set([
@@ -145,5 +147,33 @@ describe('analyse — special token detection', () => {
     expect(email?.type).toBe('email')
     // Should NOT be classified as 'name'
     expect(tokens.filter(t => t.type === 'name').every(t => t.text !== email?.text)).toBe(true)
+  })
+})
+
+describe('false-positive reduction', () => {
+  it('KNOWN_NON_PERSONS: Google is not a name', () => {
+    const tokens = analyse('Google veröffentlichte gestern neue Daten.', {})
+    expect(tokens.find(t => t.text === 'Google')?.type).not.toBe('name')
+  })
+
+  it('KNOWN_NON_PERSONS: Apple is not a name', () => {
+    const tokens = analyse('Apple ist ein Tech-Unternehmen.', {})
+    expect(tokens.find(t => t.text === 'Apple')?.type).not.toBe('name')
+  })
+
+  it('Pass 3: plain dict word not spread via consistency propagation', () => {
+    // 'Firma' is in the test dict and not a COMMON_SURNAME.
+    // Even when it appears mid-sentence in uppercase it must stay 'word',
+    // and must NOT cause a sentence-start occurrence to be promoted to 'name'.
+    const tokens = analyse('Die Firma arbeitet hier. Firma ist bekannt.', {})
+    const all = tokens.filter(t => t.text === 'Firma')
+    expect(all.every(t => t.type !== 'name')).toBe(true)
+  })
+
+  it('Pass 2: phone token after name not chained as name', () => {
+    // A phone number immediately following a name must stay a phone token,
+    // not be absorbed as a chained name by Pass 2.
+    const tokens = analyse('Thomas +49 30 12345678 ist erreichbar.', {})
+    expect(tokens.some(t => t.type === 'phone')).toBe(true)
   })
 })
