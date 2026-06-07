@@ -46,11 +46,6 @@ def main():
     except ImportError:
         sys.exit("spaCy nicht installiert — pip install spacy")
 
-    icon_arg = []
-    icon_win = ROOT / "public" / "favicon-96x96.png"
-    if icon_win.exists():
-        icon_arg = ["--icon", str(icon_win)]
-
     # Modell-Daten nur einbetten wenn lokal installiert (CI baut ohne Modell)
     model_args = []
     try:
@@ -75,7 +70,6 @@ def main():
         "--collect-data", "spacy",
         "--hidden-import", "spacy.lang.de",
         *model_args,
-        *icon_arg,
         str(HERE / "namescrub_gui.py"),
     ]
 
@@ -91,7 +85,7 @@ def main():
 
     if exe.exists():
         size_mb = sum(f.stat().st_size for f in exe.rglob("*") if f.is_file()) / 1024 / 1024
-        print(f"\n✓ Build erfolgreich: {exe}  ({size_mb:.0f} MB)")
+        print(f"\nBuild erfolgreich: {exe}  ({size_mb:.0f} MB)")
         print("\nHinweis: Beim ersten Start muss das spaCy-Modell installiert sein:")
         print("  pip install spacy")
         print("  python -m spacy download de_core_news_lg")

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/namescrub_logo_long.svg" alt="NameScrub" height="80" />
+  <img src="public/logo_lang.svg" alt="NameScrub" height="200" />
   <br/><br/>
   <strong>Anonymisierung deutscher Texte — direkt im Browser oder als Desktop-App.</strong>
   <br/><br/>
