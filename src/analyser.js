@@ -48,12 +48,30 @@ export const COMMON_SURNAMES = new Set([
 export const NAME_SUFFIX_RE = /(mann|stein|berg|thal|tal|feld|burg|hausen|dorf|beck|ow|ke|ki)$/i
 
 // Endings characteristic of German adjectives and adverbs — never names.
-export const WORD_SUFFIX_RE = /(lich|isch|haft|sam|bar|los|voll|reich|arm|weise|mäßig|artig|fähig|würdig|fertig|bereit|wert|ung|schaft|heit|keit|tum|nis|sal)$/i
+export const WORD_SUFFIX_RE = /(lich|isch|haft|sam|bar|los|voll|reich|arm|weise|mäßig|artig|fähig|würdig|fertig|bereit|wert|ung|schaft|heit|keit|tum|nis|sal|tion|sion|ismus|ität|ment|enz)$/i
 
 // German legal / organisational forms — never personal names.
 export const LEGAL_FORMS = new Set([
   'gmbh', 'ag', 'kg', 'kgaa', 'ohg', 'gbr', 'ug', 'ev', 'se',
   'mbh', 'sarl', 'llc', 'ltd', 'inc', 'bv', 'nv',
+])
+
+// Proper nouns frequently appearing in German text that are NOT person names.
+// Tech brands, platforms and widely used loanwords that would otherwise be
+// classified as name candidates (unknown uppercase mid-sentence words).
+export const KNOWN_NON_PERSONS = new Set([
+  // Tech companies / platforms
+  'google','apple','microsoft','amazon','meta','netflix','spotify',
+  'facebook','instagram','twitter','youtube','whatsapp','telegram',
+  'tiktok','linkedin','snapchat','pinterest','reddit','twitch',
+  'paypal','ebay','airbnb','uber','tesla',
+  // Crypto / finance
+  'bitcoin','ethereum','blockchain',
+  // Generic tech terms used as proper nouns
+  'internet','intranet','software','hardware','podcast',
+  'android','ios','linux','windows','macos',
+  // News / media orgs commonly abbreviated or written as single proper nouns
+  'spiegel','focus','bild','stern','zeit',
 ])
 
 // Abbreviations that end in "." but are NOT sentence boundaries.
@@ -75,26 +93,29 @@ export const VERB_FORMS = new Set([
   'darf','durfte','dürfte','mag','mochte','möchte','will','wollte',
   // Movement / state
   'geht','kommt','läuft','fährt','fliegt','reist','zieht','bleibt',
-  'steht','sitzt','liegt','wohnt','lebt','stirbt',
+  'steht','sitzt','liegt','wohnt','lebt','stirbt','scheint','gilt',
   // Communication
   'sagt','spricht','erklärt','berichtet','schreibt','liest','fragt',
   'antwortet','ruft','postet','tweetet','teilt','veröffentlicht',
+  'betont','bestätigt','meldet','kündigt','klagt','verkündet',
   // Cognition
   'denkt','glaubt','weiß','kennt','versteht','meint','findet','sieht',
-  'hört','erinnert','ahnt','hofft','befürchtet',
+  'hört','erinnert','ahnt','hofft','befürchtet','stimmt','zweifelt',
   // Action
   'macht','tut','arbeitet','hilft','kämpft','sucht','nimmt','gibt',
   'bringt','trägt','hält','lässt','stellt','setzt','legt','zeigt',
   'öffnet','schließt','beginnt','endet','startet','stoppt','wartet',
-  'kauft','verkauft','zahlt','besitzt','gehört','betreibt',
+  'kauft','verkauft','zahlt','besitzt','gehört','betreibt','wechselt',
   'trifft','besucht','empfängt','begrüßt','schläft','isst','trinkt',
-  'spielt','singt','tanzt','lernt','übt','trainiert',
+  'spielt','singt','tanzt','lernt','übt','trainiert','streitet',
   // Professional
   'leitet','führt','studiert','lehrt','forscht','entwickelt','plant',
   'entscheidet','beschließt','verhandelt','fordert','kritisiert',
   'unterstützt','vertritt','übernimmt','verantwortet','präsentiert',
+  'kandidiert','protestiert','demonstriert','streikt','investiert',
   // Life events
   'heiratet','bekommt','erhält','verliert','gewinnt','erreicht','scheitert','feiert',
+  'zählt','rechnet','unterschreibt',
 ])
 
 /** Dictionary inflection suffixes for lookup */
@@ -220,6 +241,7 @@ export function classify(token, index, tokens, sentenceStarts) {
   if (HONORIFICS.has(lower)) return 'skip'
   if (PARTICLES.has(lower)) return 'skip'
   if (LEGAL_FORMS.has(lower)) return 'skip'
+  if (KNOWN_NON_PERSONS.has(lower)) return 'word'
   if (isAbbreviation(clean)) return 'skip'
 
   // Word after an honorific — limit raised to 8 for multi-title chains
@@ -418,7 +440,8 @@ export function analyse(text, options = {}) {
     if (j === -1) continue
 
     const candidate = result[j]
-    if (candidate.type === 'space' || candidate.type === 'honorific-name' || candidate.type === 'name') continue
+    if (candidate.type === 'space' || candidate.type === 'honorific-name' || candidate.type === 'name'
+        || candidate.type === 'email' || candidate.type === 'phone' || candidate.type === 'date') continue
 
     const raw = candidate.text
     const clean = normalise(raw)
@@ -436,7 +459,7 @@ export function analyse(text, options = {}) {
   for (const tok of result) {
     if (tok.type === 'name' || tok.type === 'honorific-name') {
       const key = normalise(tok.text).toLowerCase()
-      if (key.length >= 3) nameKeys.add(key)
+      if (key.length >= 3 && (!inDict(key) || COMMON_SURNAMES.has(key))) nameKeys.add(key)
     }
   }
 
@@ -479,6 +502,7 @@ export function analyse(text, options = {}) {
 
     const lower = normalise(raw).toLowerCase()
     if (inDict(lower) || WORD_SUFFIX_RE.test(lower)) continue   // definitely a word
+    if (KNOWN_NON_PERSONS.has(lower)) continue
 
     const j = nextContentToken(result, i, 1)
     if (j === -1) continue
