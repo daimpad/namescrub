@@ -682,3 +682,30 @@ footer {
   .plus-modal-header { padding: 1.25rem 1rem; }
   .plus-modal-footer { padding: 1rem; }
 }
+
+/* ── Undo button ──────────────────────────────────────────────────────── */
+#btn-undo {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-undo:hover:not(:disabled) { background: var(--nz-paper-alt); }
+
+/* ── File open button ────────────────────────────────────────────────── */
+#btn-file-open {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-file-open:hover:not(:disabled) { background: var(--nz-paper-alt); }
+
+/* ── Drag-over state for input panel ─────────────────────────────────── */
+.input-panel.drag-over {
+  outline: 3px dashed var(--nz-ink);
+  outline-offset: -3px;
+}
+
+/* ── Download button ─────────────────────────────────────────────────── */
+#btn-download {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-download:hover:not(:disabled) { background: var(--nz-paper-alt); }
