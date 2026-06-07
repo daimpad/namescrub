@@ -123,11 +123,15 @@ python namescrub_gui.py</pre>
   <div class="controls">
     <span id="status" class="status-hidden" aria-live="polite"></span>
     <button id="btn-analyse" disabled>Analyse starten</button>
+    <button id="btn-file-open">Datei öffnen</button>
+    <input type="file" id="file-input" accept=".txt,.md" hidden>
     <button id="btn-purge"   disabled>Alle ersetzen</button>
+    <button id="btn-undo" disabled>↩ Rückgängig</button>
     <label class="opt-label" title="Datumsangaben wie 12.03.2024 erkennen und anonymisieren">
       <input type="checkbox" id="opt-dates"> Datumsangaben
     </label>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
+    <button id="btn-download" disabled>↓ Herunterladen</button>
   </div>
 
   <div class="legend">
@@ -165,6 +169,7 @@ python namescrub_gui.py</pre>
     </a>
   </nav>
   <a href="https://nozilla.de" target="_blank" rel="noopener" class="footer-brand">nozilla | bits &amp; bytes mit ❤</a>
+  <span id="footer-version" class="footer-version"></span>
 </footer>
 
 <script type="module" src="/src/app.js"></script>

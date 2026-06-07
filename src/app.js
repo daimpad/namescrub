@@ -29,6 +29,7 @@ let phoneCounter = 0
 let dateMap     = new Map()   // lowercase date → "Datum-N"
 let dateCounter = 0
 let activePopup = null
+let history = []
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 
@@ -42,6 +43,10 @@ const statusEl     = document.getElementById('status')
 const headerStatusEl = document.getElementById('header-status')
 const inputHintEl  = document.getElementById('input-hint')
 const statsEl      = document.getElementById('stats')
+const undoBtn      = document.getElementById('btn-undo')
+const downloadBtn  = document.getElementById('btn-download')
+const fileInputEl  = document.getElementById('file-input')
+const btnFileOpen  = document.getElementById('btn-file-open')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +64,9 @@ async function init() {
 
   setStatus('Text einfügen und Analyse starten.', 'ready')
   analyseBtn.disabled = false
+
+  const versionEl = document.getElementById('footer-version')
+  if (versionEl) versionEl.textContent = `v${__APP_VERSION__} · ${__BUILD_DATE__}`
 }
 
 // ── Analysis ───────────────────────────────────────────────────────────────
@@ -82,6 +90,21 @@ async function analyse() {
   emailMap = new Map(); emailCounter = 0
   phoneMap = new Map(); phoneCounter = 0
   dateMap = new Map(); dateCounter = 0
+  history = []
+  if (downloadBtn) downloadBtn.disabled = true
+  renderOutput()
+}
+
+// ── History / Undo ─────────────────────────────────────────────────────────
+
+function pushHistory() {
+  history.push(currentTokens.map(t => ({ ...t })))
+}
+
+function undo() {
+  if (history.length === 0) return
+  currentTokens = history.pop()
+  closePopup()
   renderOutput()
 }
 
@@ -141,6 +164,7 @@ function peekSpecialPlaceholder(text, type) {
 }
 
 function replaceAllBySpecial(text, type) {
+  pushHistory()
   const ph = getSpecialPlaceholder(text, type)
   currentTokens = currentTokens.map(tok =>
     (tok.type === type && tok.text === text) ? { ...tok, type: 'replaced', placeholder: ph } : tok
@@ -149,6 +173,7 @@ function replaceAllBySpecial(text, type) {
 
 // Replace all tokens with the same name in one go
 function replaceAllByName(text) {
+  pushHistory()
   const key = normKey(text)
   const placeholder = getPlaceholder(text)
   currentTokens = currentTokens.map(tok => {
@@ -188,6 +213,7 @@ function showPopup(span, idx) {
   btnDelete.textContent = '× Löschen'
   btnDelete.addEventListener('click', (e) => {
     e.stopPropagation()
+    pushHistory()
     currentTokens[idx] = { ...tok, type: 'removed', text: '' }
     closePopup(); renderOutput()
   })
@@ -197,6 +223,7 @@ function showPopup(span, idx) {
   btnFP.textContent = FP_LABELS[tok.type] || '✓ Behalten'
   btnFP.addEventListener('click', (e) => {
     e.stopPropagation()
+    pushHistory()
     currentTokens[idx] = { ...tok, type: 'word' }
     closePopup(); renderOutput()
   })
@@ -283,11 +310,14 @@ function renderOutput() {
   )
   purgeBtn.disabled = totalSpecial === 0
   copyBtn.disabled = false
+  if (undoBtn) undoBtn.disabled = history.length === 0
+  if (downloadBtn) downloadBtn.disabled = false
 }
 
 // ── Bulk replace ───────────────────────────────────────────────────────────
 
 function purge() {
+  pushHistory()
   currentTokens = currentTokens.map(tok => {
     if (tok.type === 'name' || tok.type === 'honorific-name') {
       return { ...tok, type: 'replaced', placeholder: getPlaceholder(tok.text) }
@@ -312,6 +342,30 @@ async function copyToClipboard() {
   } catch {
     setStatus('Kopieren fehlgeschlagen — Browser-Berechtigung fehlt.', 'error')
   }
+}
+
+// ── Download ───────────────────────────────────────────────────────────────
+
+function downloadResult() {
+  const text = outputEl.innerText
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'anonymisiert.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── File loading ───────────────────────────────────────────────────────────
+
+function loadFile(file) {
+  if (!file || !file.name.match(/\.(txt|md)$/i)) {
+    setStatus('Nur .txt und .md Dateien werden unterstützt.', 'warn')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = (e) => { inputEl.value = e.target.result; setStatus('Datei geladen.', 'ready') }
+  reader.readAsText(file, 'utf-8')
 }
 
 // ── Status helper ──────────────────────────────────────────────────────────
@@ -346,6 +400,7 @@ plusBackdrop?.addEventListener('click', closePlusModal)
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && plusModal && !plusModal.hidden) closePlusModal()
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); undo() }
 })
 
 // ── Event listeners ────────────────────────────────────────────────────────
@@ -353,6 +408,17 @@ document.addEventListener('keydown', (e) => {
 analyseBtn.addEventListener('click', analyse)
 purgeBtn.addEventListener('click', purge)
 copyBtn.addEventListener('click', copyToClipboard)
+undoBtn?.addEventListener('click', undo)
+downloadBtn?.addEventListener('click', downloadResult)
+
+btnFileOpen?.addEventListener('click', () => fileInputEl?.click())
+fileInputEl?.addEventListener('change', () => { loadFile(fileInputEl.files[0]); fileInputEl.value = '' })
+
+// Drag & drop on input panel
+const inputPanelEl = document.querySelector('.input-panel')
+inputPanelEl?.addEventListener('dragover', (e) => { e.preventDefault(); inputPanelEl.classList.add('drag-over') })
+inputPanelEl?.addEventListener('dragleave', () => inputPanelEl.classList.remove('drag-over'))
+inputPanelEl?.addEventListener('drop', (e) => { e.preventDefault(); inputPanelEl.classList.remove('drag-over'); loadFile(e.dataTransfer.files[0]) })
 
 // Toggle date legend item visibility when checkbox changes
 const legendDateEl = document.getElementById('legend-date')

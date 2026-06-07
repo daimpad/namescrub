@@ -472,6 +472,7 @@ footer {
   gap: 1.25rem;
   color: var(--nz-ink-70);
   background: var(--nz-paper);
+  position: relative;
 }
 
 .footer-links {
@@ -499,6 +500,18 @@ footer {
   text-decoration: none;
   letter-spacing: 0.06em;
   text-transform: none;
+}
+
+.footer-version {
+  position: absolute;
+  bottom: 1rem;
+  right: 2rem;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--nz-ink-20);
+  letter-spacing: 0;
+  text-transform: none;
+  user-select: none;
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
@@ -743,3 +756,30 @@ footer {
   .plus-modal-header { padding: 1.25rem 1rem; }
   .plus-modal-footer { padding: 1rem; }
 }
+
+/* ── Undo button ──────────────────────────────────────────────────────── */
+#btn-undo {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-undo:hover:not(:disabled) { background: var(--nz-paper-alt); }
+
+/* ── File open button ────────────────────────────────────────────────── */
+#btn-file-open {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-file-open:hover:not(:disabled) { background: var(--nz-paper-alt); }
+
+/* ── Drag-over state for input panel ─────────────────────────────────── */
+.input-panel.drag-over {
+  outline: 3px dashed var(--nz-ink);
+  outline-offset: -3px;
+}
+
+/* ── Download button ─────────────────────────────────────────────────── */
+#btn-download {
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+}
+#btn-download:hover:not(:disabled) { background: var(--nz-paper-alt); }
