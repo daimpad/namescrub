@@ -64,6 +64,9 @@ async function init() {
 
   setStatus('Text einfügen und Analyse starten.', 'ready')
   analyseBtn.disabled = false
+
+  const versionEl = document.getElementById('footer-version')
+  if (versionEl) versionEl.textContent = `v${__APP_VERSION__} · ${__BUILD_DATE__}`
 }
 
 // ── Analysis ───────────────────────────────────────────────────────────────
