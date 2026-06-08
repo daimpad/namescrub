@@ -3,16 +3,13 @@ name: Build & Release NameScrub+
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag_name:
         description: 'Release-Tag (z.B. v1.0.0)'
         required: true
         default: 'v1.0.0'
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -42,6 +39,35 @@ jobs:
       - name: Install dependencies
         run: pip install spacy pyinstaller Pillow
 
+      - name: Cache spaCy model
+        id: cache-spacy
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.tool_cache }}/spacy-models
+          key: spacy-de_core_news_lg-${{ runner.os }}
+
+      - name: Download spaCy model
+        if: steps.cache-spacy.outputs.cache-hit != 'true'
+        run: python -m spacy download de_core_news_lg
+
+      - name: Restore spaCy model from cache
+        if: steps.cache-spacy.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          MODEL_CACHE="${{ runner.tool_cache }}/spacy-models"
+          if [ -d "$MODEL_CACHE" ]; then
+            pip install --no-index --find-links="$MODEL_CACHE" de_core_news_lg || true
+          fi
+
+      - name: Save spaCy model to cache
+        if: steps.cache-spacy.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          MODEL_CACHE="${{ runner.tool_cache }}/spacy-models"
+          mkdir -p "$MODEL_CACHE"
+          pip download de_core_news_lg --no-deps -d "$MODEL_CACHE" || true
+
       - name: Build executable
         run: python cli/build_exe.py
         env:
@@ -66,6 +92,8 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -122,3 +150,4 @@ jobs:
             artifacts/NameScrub-macos/NameScrub-macos
           draft: false
           prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
