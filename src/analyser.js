@@ -347,8 +347,11 @@ const PHONE_RE = /(?:\+\d{1,3}[\s\-]?)(?:\(?\d{1,4}\)?[\s\-]?)(?:\d[\s\-]?){4,12
 // German date formats: DD.MM.YYYY, D.M.YYYY, DD.MM.YY
 const DATE_RE = /\b\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})\b/g
 
+// German street addresses: "Musterstraße 12", "Bahnhofstr. 5a", "Am Markt 3, 10115 Berlin"
+const ADDRESS_RE = /[A-ZÄÖÜ][a-zäöüßA-ZÄÖÜ]+(?:straße|strasse|str\.|gasse|weg|allee|platz|ring|damm|chaussee|ufer|steig|pfad|stieg|promenade)\s+\d+[a-zA-Z]?(?:,\s*\d{5}\s+[A-ZÄÖÜ][a-zäöüß]+)?/g
+
 /**
- * Pre-processing pass: detect emails, phone numbers, and optionally dates.
+ * Pre-processing pass: detect emails, phone numbers, and optionally dates/addresses.
  * Replaces them with unique placeholder markers in the text so they are not
  * subject to name-classification, then returns a map for later reconstruction.
  *
@@ -372,6 +375,13 @@ export function preProcess(text, options = {}) {
   if (options.detectDates) {
     for (const m of text.matchAll(DATE_RE)) {
       matches.push({ start: m.index, end: m.index + m[0].length, type: 'date', original: m[0] })
+    }
+  }
+
+  if (options.detectAddresses) {
+    ADDRESS_RE.lastIndex = 0
+    for (const m of text.matchAll(ADDRESS_RE)) {
+      matches.push({ start: m.index, end: m.index + m[0].length, type: 'address', original: m[0] })
     }
   }
 
@@ -402,7 +412,7 @@ export function preProcess(text, options = {}) {
 
 /**
  * Main analyse function.
- * Accepts text and options { detectDates } and returns an array of token objects.
+ * Accepts text and options { detectDates, detectAddresses } and returns an array of token objects.
  */
 export function analyse(text, options = {}) {
   // Pre-process: replace emails, phones, dates with markers
