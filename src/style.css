@@ -280,6 +280,18 @@ main {
 }
 .token.date:hover { background: #FFBA6B; outline: 2px solid var(--nz-ink); }
 
+.token.address {
+  background: #B9FBC0;
+  border: 2px solid var(--nz-ink);
+  padding: 0 3px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background var(--nz-dur);
+  display: inline;
+  position: relative;
+}
+.token.address:hover { background: #82EF90; outline: 2px solid var(--nz-ink); }
+
 /* ── Name popup ───────────────────────────────────────────────────────── */
 .name-popup {
   position: absolute;
@@ -358,6 +370,80 @@ main {
   height: 1rem;
   accent-color: var(--nz-green);
   cursor: pointer;
+}
+
+/* ── Prefix customisation (collapsible) ───────────────────────────────── */
+.prefix-details {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.prefix-summary {
+  cursor: pointer;
+  user-select: none;
+  color: var(--nz-ink);
+  padding: 0.3rem 0;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.prefix-summary::-webkit-details-marker { display: none; }
+
+.prefix-summary::before {
+  content: '▶';
+  font-size: 0.55rem;
+  transition: transform var(--nz-dur);
+}
+
+details[open] .prefix-summary::before {
+  transform: rotate(90deg);
+}
+
+.prefix-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.6rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--nz-ink);
+  background: var(--nz-paper);
+}
+
+.prefix-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nz-ink);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.prefix-input {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  border: 2px solid var(--nz-ink);
+  background: var(--nz-paper);
+  color: var(--nz-ink);
+  padding: 0.2rem 0.4rem;
+  width: 8rem;
+  outline: none;
+  transition: box-shadow var(--nz-dur);
+}
+
+.prefix-input:focus {
+  box-shadow: 2px 2px 0 var(--nz-ink);
+}
+
+.prefix-input::placeholder {
+  color: var(--nz-ink-70);
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
@@ -448,6 +534,7 @@ button:disabled {
 .legend-swatch.email     { background: #A8DAFF; }
 .legend-swatch.phone     { background: #E0AAFF; }
 .legend-swatch.date      { background: #FFD6A5; }
+.legend-swatch.address   { background: #B9FBC0; }
 .legend-swatch.replaced  { background: var(--nz-ink); }
 
 /* ── Status (hidden — shown in header) ────────────────────────────────── */

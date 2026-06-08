@@ -177,3 +177,27 @@ describe('false-positive reduction', () => {
     expect(tokens.some(t => t.type === 'phone')).toBe(true)
   })
 })
+
+describe('analyse — address detection', () => {
+  it('returns address token when detectAddresses is true', () => {
+    const tokens = analyse('Er wohnt in der Musterstraße 12 hier.', { detectAddresses: true })
+    expect(tokens.some(t => t.type === 'address')).toBe(true)
+  })
+
+  it('does NOT return address token when detectAddresses is false', () => {
+    const tokens = analyse('Er wohnt in der Musterstraße 12 hier.', { detectAddresses: false })
+    expect(tokens.some(t => t.type === 'address')).toBe(false)
+  })
+
+  it('does NOT return address token when option is omitted', () => {
+    const tokens = analyse('Er wohnt in der Musterstraße 12 hier.')
+    expect(tokens.some(t => t.type === 'address')).toBe(false)
+  })
+
+  it('detects address with postcode and city', () => {
+    const tokens = analyse('Schick es an Bahnhofstraße 5, 10115 Berlin bitte.', { detectAddresses: true })
+    const addr = tokens.find(t => t.type === 'address')
+    expect(addr?.text).toContain('Bahnhofstraße 5')
+    expect(addr?.text).toContain('10115 Berlin')
+  })
+})

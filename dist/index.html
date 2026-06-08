@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@700&family=Inter:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/main-C-kjhGG1.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-bqFJAgmW.css">
+  <script type="module" crossorigin src="./assets/main-B7XnHbPp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-DEb9rLK_.css">
 </head>
 <body>
 
@@ -131,8 +131,26 @@ python namescrub_gui.py</pre>
     <label class="opt-label" title="Datumsangaben wie 12.03.2024 erkennen und anonymisieren">
       <input type="checkbox" id="opt-dates"> Datumsangaben
     </label>
+    <label class="opt-label" title="Adressen wie Musterstraße 12, 10115 Berlin erkennen">
+      <input type="checkbox" id="opt-addresses"> Adressen
+    </label>
     <button id="btn-copy"    disabled>In Zwischenablage kopieren</button>
     <button id="btn-download" disabled>↓ Herunterladen</button>
+    <details class="prefix-details">
+      <summary class="prefix-summary">Bezeichnungen anpassen</summary>
+      <div class="prefix-grid">
+        <label class="prefix-label" for="prefix-name">Namen</label>
+        <input class="prefix-input" id="prefix-name" type="text" maxlength="20" placeholder="Name">
+        <label class="prefix-label" for="prefix-email">E-Mail</label>
+        <input class="prefix-input" id="prefix-email" type="text" maxlength="20" placeholder="Email">
+        <label class="prefix-label" for="prefix-phone">Telefon</label>
+        <input class="prefix-input" id="prefix-phone" type="text" maxlength="20" placeholder="Tel">
+        <label class="prefix-label" for="prefix-date">Datum</label>
+        <input class="prefix-input" id="prefix-date" type="text" maxlength="20" placeholder="Datum">
+        <label class="prefix-label" for="prefix-address">Adresse</label>
+        <input class="prefix-input" id="prefix-address" type="text" maxlength="20" placeholder="Adresse">
+      </div>
+    </details>
   </div>
 
   <div class="legend">
@@ -151,6 +169,9 @@ python namescrub_gui.py</pre>
     </span>
     <span class="legend-item" id="legend-date" hidden>
       <span class="legend-swatch date"></span> Datum → klicken
+    </span>
+    <span class="legend-item" id="legend-address" hidden>
+      <span class="legend-swatch address"></span> Adresse → klicken
     </span>
     <span class="legend-item">
       <span class="legend-swatch replaced"></span> Ersetzt

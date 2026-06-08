@@ -20,39 +20,76 @@ function call(action, payload = {}) {
 // ── State ──────────────────────────────────────────────────────────────────
 
 let currentTokens = []
-let nameMap     = new Map()   // normKey → "Name-N"
+let nameMap     = new Map()
 let nameCounter = 0
-let emailMap    = new Map()   // lowercase email → "Email-N"
+let emailMap    = new Map()
 let emailCounter = 0
-let phoneMap    = new Map()   // phone string → "Tel-N"
+let phoneMap    = new Map()
 let phoneCounter = 0
-let dateMap     = new Map()   // lowercase date → "Datum-N"
+let dateMap     = new Map()
 let dateCounter = 0
+let addressMap  = new Map()
+let addressCounter = 0
 let activePopup = null
 let history = []
 
+// ── Configurable prefix labels ─────────────────────────────────────────────
+
+const PREFIX_DEFAULTS = { name: 'Name', email: 'Email', phone: 'Tel', date: 'Datum', address: 'Adresse' }
+const LS_PREFIX_KEY = 'namescrub_prefixes'
+
+function getPrefix(type) {
+  const el = document.getElementById(`prefix-${type}`)
+  return el?.value?.trim() || PREFIX_DEFAULTS[type]
+}
+
+function loadPrefixes() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_PREFIX_KEY) || '{}')
+    for (const type of Object.keys(PREFIX_DEFAULTS)) {
+      const el = document.getElementById(`prefix-${type}`)
+      if (el && stored[type]) el.value = stored[type]
+    }
+  } catch { /* ignore */ }
+}
+
+function savePrefixes() {
+  const out = {}
+  for (const type of Object.keys(PREFIX_DEFAULTS)) {
+    const el = document.getElementById(`prefix-${type}`)
+    if (el && el.value.trim()) out[type] = el.value.trim()
+  }
+  try { localStorage.setItem(LS_PREFIX_KEY, JSON.stringify(out)) } catch { /* ignore */ }
+}
+
 // ── DOM refs ───────────────────────────────────────────────────────────────
 
-const inputEl      = document.getElementById('input')
-const outputEl     = document.getElementById('output')
-const analyseBtn   = document.getElementById('btn-analyse')
-const purgeBtn     = document.getElementById('btn-purge')
-const copyBtn      = document.getElementById('btn-copy')
-const optDatesEl   = document.getElementById('opt-dates')
-const statusEl     = document.getElementById('status')
+const inputEl        = document.getElementById('input')
+const outputEl       = document.getElementById('output')
+const analyseBtn     = document.getElementById('btn-analyse')
+const purgeBtn       = document.getElementById('btn-purge')
+const copyBtn        = document.getElementById('btn-copy')
+const optDatesEl     = document.getElementById('opt-dates')
+const optAddressesEl = document.getElementById('opt-addresses')
+const statusEl       = document.getElementById('status')
 const headerStatusEl = document.getElementById('header-status')
-const inputHintEl  = document.getElementById('input-hint')
-const statsEl      = document.getElementById('stats')
-const undoBtn      = document.getElementById('btn-undo')
-const downloadBtn  = document.getElementById('btn-download')
-const fileInputEl  = document.getElementById('file-input')
-const btnFileOpen  = document.getElementById('btn-file-open')
+const inputHintEl    = document.getElementById('input-hint')
+const statsEl        = document.getElementById('stats')
+const undoBtn        = document.getElementById('btn-undo')
+const downloadBtn    = document.getElementById('btn-download')
+const fileInputEl    = document.getElementById('file-input')
+const btnFileOpen    = document.getElementById('btn-file-open')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
 async function init() {
   setStatus('Wörterbuch wird geladen…', 'loading')
   analyseBtn.disabled = true
+
+  loadPrefixes()
+  for (const type of Object.keys(PREFIX_DEFAULTS)) {
+    document.getElementById(`prefix-${type}`)?.addEventListener('input', savePrefixes)
+  }
 
   const dictUrl = new URL('dictionary.json', window.location.href).href
   const namesUrl = new URL('firstnames.json', window.location.href).href
@@ -80,7 +117,10 @@ async function analyse() {
   outputEl.innerHTML = ''
   closePopup()
 
-  const options = { detectDates: optDatesEl?.checked ?? false }
+  const options = {
+    detectDates:     optDatesEl?.checked ?? false,
+    detectAddresses: optAddressesEl?.checked ?? false,
+  }
   const res = await call('analyse', { text, options })
   analyseBtn.disabled = false
   if (!res.ok) { setStatus(`Fehler: ${res.error}`, 'error'); return }
@@ -90,6 +130,7 @@ async function analyse() {
   emailMap = new Map(); emailCounter = 0
   phoneMap = new Map(); phoneCounter = 0
   dateMap = new Map(); dateCounter = 0
+  addressMap = new Map(); addressCounter = 0
   history = []
   if (downloadBtn) downloadBtn.disabled = true
   renderOutput()
@@ -118,7 +159,7 @@ function getPlaceholder(text) {
   const key = normKey(text)
   if (!nameMap.has(key)) {
     nameCounter++
-    nameMap.set(key, `Name-${nameCounter}`)
+    nameMap.set(key, `${getPrefix('name')}-${nameCounter}`)
   }
   return nameMap.get(key)
 }
@@ -126,39 +167,47 @@ function getPlaceholder(text) {
 function peekPlaceholder(text) {
   const key = normKey(text)
   if (nameMap.has(key)) return nameMap.get(key)
-  return `Name-${nameCounter + 1}`
+  return `${getPrefix('name')}-${nameCounter + 1}`
 }
 
-// ── Special-token placeholders (email / phone / date) ─────────────────────
+// ── Special-token placeholders (email / phone / date / address) ───────────
 
 function getSpecialPlaceholder(text, type) {
   if (type === 'email') {
     const k = text.toLowerCase()
-    if (!emailMap.has(k)) { emailCounter++; emailMap.set(k, `Email-${emailCounter}`) }
+    if (!emailMap.has(k)) { emailCounter++; emailMap.set(k, `${getPrefix('email')}-${emailCounter}`) }
     return emailMap.get(k)
   }
   if (type === 'phone') {
     const k = text.replace(/\s+/g, ' ')
-    if (!phoneMap.has(k)) { phoneCounter++; phoneMap.set(k, `Tel-${phoneCounter}`) }
+    if (!phoneMap.has(k)) { phoneCounter++; phoneMap.set(k, `${getPrefix('phone')}-${phoneCounter}`) }
     return phoneMap.get(k)
   }
   if (type === 'date') {
     const k = text.toLowerCase()
-    if (!dateMap.has(k)) { dateCounter++; dateMap.set(k, `Datum-${dateCounter}`) }
+    if (!dateMap.has(k)) { dateCounter++; dateMap.set(k, `${getPrefix('date')}-${dateCounter}`) }
     return dateMap.get(k)
+  }
+  if (type === 'address') {
+    const k = text.toLowerCase()
+    if (!addressMap.has(k)) { addressCounter++; addressMap.set(k, `${getPrefix('address')}-${addressCounter}`) }
+    return addressMap.get(k)
   }
   return text
 }
 
 function peekSpecialPlaceholder(text, type) {
   if (type === 'email') {
-    const k = text.toLowerCase(); return emailMap.get(k) || `Email-${emailCounter + 1}`
+    const k = text.toLowerCase(); return emailMap.get(k) || `${getPrefix('email')}-${emailCounter + 1}`
   }
   if (type === 'phone') {
-    const k = text.replace(/\s+/g, ' '); return phoneMap.get(k) || `Tel-${phoneCounter + 1}`
+    const k = text.replace(/\s+/g, ' '); return phoneMap.get(k) || `${getPrefix('phone')}-${phoneCounter + 1}`
   }
   if (type === 'date') {
-    const k = text.toLowerCase(); return dateMap.get(k) || `Datum-${dateCounter + 1}`
+    const k = text.toLowerCase(); return dateMap.get(k) || `${getPrefix('date')}-${dateCounter + 1}`
+  }
+  if (type === 'address') {
+    const k = text.toLowerCase(); return addressMap.get(k) || `${getPrefix('address')}-${addressCounter + 1}`
   }
   return text
 }
@@ -196,13 +245,14 @@ const FP_LABELS = {
   'email': '✓ Keine E-Mail',
   'phone': '✓ Kein Telefon',
   'date': '✓ Kein Datum',
+  'address': '✓ Keine Adresse',
 }
 
 function showPopup(span, idx) {
   closePopup()
 
   const tok = currentTokens[idx]
-  const isSpecial = tok.type === 'email' || tok.type === 'phone' || tok.type === 'date'
+  const isSpecial = SPECIAL_TYPES.has(tok.type)
   const placeholder = isSpecial ? peekSpecialPlaceholder(tok.text, tok.type) : peekPlaceholder(tok.text)
 
   const popup = document.createElement('div')
@@ -247,7 +297,7 @@ function showPopup(span, idx) {
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
-const SPECIAL_TYPES = new Set(['email', 'phone', 'date'])
+const SPECIAL_TYPES = new Set(['email', 'phone', 'date', 'address'])
 
 function renderOutput() {
   outputEl.innerHTML = ''
@@ -255,6 +305,7 @@ function renderOutput() {
   let emailCount = 0
   let phoneCount = 0
   let dateCount = 0
+  let addressCount = 0
 
   currentTokens.forEach((tok, idx) => {
     if (tok.type === 'space') {
@@ -274,6 +325,7 @@ function renderOutput() {
       if (tok.type === 'email') emailCount++
       else if (tok.type === 'phone') phoneCount++
       else if (tok.type === 'date') dateCount++
+      else if (tok.type === 'address') addressCount++
       const span = document.createElement('span')
       span.className = `token ${tok.type}`
       span.textContent = tok.text
@@ -291,7 +343,7 @@ function renderOutput() {
   })
 
   const total = currentTokens.filter(t => t.type !== 'space').length
-  const totalSpecial = nameCount + emailCount + phoneCount + dateCount
+  const totalSpecial = nameCount + emailCount + phoneCount + dateCount + addressCount
 
   if (totalSpecial === 0) {
     statsEl.textContent = `Nichts gefunden (${total} Tokens)`
@@ -301,6 +353,7 @@ function renderOutput() {
     if (emailCount > 0) parts.push(`${emailCount} E-Mail${emailCount !== 1 ? 's' : ''}`)
     if (phoneCount > 0) parts.push(`${phoneCount} Telefon${phoneCount !== 1 ? 'nummern' : 'nummer'}`)
     if (dateCount > 0) parts.push(`${dateCount} Datum${dateCount !== 1 ? 'sangaben' : ''}`)
+    if (addressCount > 0) parts.push(`${addressCount} Adresse${addressCount !== 1 ? 'n' : ''}`)
     statsEl.textContent = parts.join(', ') + ` von ${total} Tokens`
   }
 
@@ -420,10 +473,14 @@ inputPanelEl?.addEventListener('dragover', (e) => { e.preventDefault(); inputPan
 inputPanelEl?.addEventListener('dragleave', () => inputPanelEl.classList.remove('drag-over'))
 inputPanelEl?.addEventListener('drop', (e) => { e.preventDefault(); inputPanelEl.classList.remove('drag-over'); loadFile(e.dataTransfer.files[0]) })
 
-// Toggle date legend item visibility when checkbox changes
-const legendDateEl = document.getElementById('legend-date')
+// Toggle legend item visibility when checkboxes change
+const legendDateEl    = document.getElementById('legend-date')
+const legendAddressEl = document.getElementById('legend-address')
 optDatesEl?.addEventListener('change', () => {
   if (legendDateEl) legendDateEl.hidden = !optDatesEl.checked
+})
+optAddressesEl?.addEventListener('change', () => {
+  if (legendAddressEl) legendAddressEl.hidden = !optAddressesEl.checked
 })
 
 // Popup schließen bei Klick außerhalb
