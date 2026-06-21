@@ -824,6 +824,18 @@ footer {
 .btn-plus-download:hover { background: var(--nz-green-strong); }
 .btn-plus-download:active { transform: translate(3px,3px); box-shadow: none; }
 
+.plus-download-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-plus-download--platform {
+  font-size: 0.7rem;
+  padding: 0.6rem 1rem;
+}
+
 .plus-github-link {
   font-family: var(--font-mono);
   font-size: 0.72rem;

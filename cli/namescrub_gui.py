@@ -181,6 +181,14 @@ class NameScrubApp:
         self.btn_save.pack(side=tk.LEFT, padx=(0, 8))
         self.btn_save.config(state=tk.DISABLED)
 
+        self.btn_batch = tk.Button(
+            btns, text="Ordner verarbeiten…",
+            bg=BG, fg=INK, activebackground="#F0EFC0",
+            command=self._batch_folder, **btn_cfg,
+        )
+        self.btn_batch.pack(side=tk.LEFT, padx=(0, 8))
+        self.btn_batch.config(state=tk.DISABLED)
+
         self.btn_copy = tk.Button(
             btns, text="In Zwischenablage",
             bg=INK, fg=GREEN, activebackground="#222222",
@@ -188,6 +196,15 @@ class NameScrubApp:
         )
         self.btn_copy.pack(side=tk.RIGHT)
         self.btn_copy.config(state=tk.DISABLED)
+
+        # ── Fortschrittsbalken ────────────────────────────────────────────────
+        progress_frame = tk.Frame(self.root, bg=BG, padx=14, pady=0)
+        progress_frame.pack(fill=tk.X)
+
+        self.progressbar = ttk.Progressbar(
+            progress_frame, mode="indeterminate", length=0,
+        )
+        self.progressbar.pack(fill=tk.X, ipady=4)
 
         # ── Statusleiste ──────────────────────────────────────────────────────
         self.status_var = tk.StringVar(value="Modell wird geladen…")
@@ -216,6 +233,7 @@ class NameScrubApp:
     def _on_model_ready(self):
         self.model_label.config(text=f"✓ {self.model_name}", fg=GREEN)
         self.btn_analyse.config(state=tk.NORMAL)
+        self.btn_batch.config(state=tk.NORMAL)
         self.status_var.set("Bereit. Text eingeben und Analyse starten.")
 
     def _on_spacy_missing(self):
@@ -248,6 +266,7 @@ class NameScrubApp:
 
         self.btn_analyse.config(state=tk.DISABLED, text="Analyse läuft…")
         self.status_var.set("Analyse läuft…")
+        self._progress_start(indeterminate=True)
         entity_types = self._get_entity_types()
 
         def run():
@@ -258,6 +277,7 @@ class NameScrubApp:
         threading.Thread(target=run, daemon=True).start()
 
     def _show_result(self, result: str, mapping: dict):
+        self._progress_stop()
         self.output_text.config(state=tk.NORMAL)
         self.output_text.delete("1.0", tk.END)
 
@@ -289,6 +309,112 @@ class NameScrubApp:
         self.btn_analyse.config(state=tk.NORMAL, text="Analyse starten")
         self.btn_save.config(state=tk.NORMAL)
         self.btn_copy.config(state=tk.NORMAL)
+
+    # ── Fortschrittsbalken-Hilfsmethoden ──────────────────────────────────────
+
+    def _progress_start(self, indeterminate: bool = True, maximum: int = 100):
+        """Startet den Fortschrittsbalken. indeterminate=True für unbekannte Dauer."""
+        if indeterminate:
+            self.progressbar.config(mode="indeterminate")
+            self.progressbar.start(15)
+        else:
+            self.progressbar.config(mode="determinate", maximum=maximum, value=0)
+
+    def _progress_stop(self):
+        """Stoppt den Fortschrittsbalken und setzt ihn zurück."""
+        self.progressbar.stop()
+        self.progressbar.config(mode="determinate", value=0)
+
+    def _set_progress(self, value: int):
+        """Setzt den Fortschrittswert des Balkens (nur im determinate-Modus)."""
+        self.progressbar["value"] = value
+
+    # ── Batch-Verarbeitung ────────────────────────────────────────────────────
+
+    def _batch_folder(self):
+        if not self.nlp:
+            return
+
+        folder = filedialog.askdirectory(title="Ordner mit .txt-Dateien auswählen")
+        if not folder:
+            return
+
+        txt_files = sorted(Path(folder).rglob("*.txt"))
+
+        if not txt_files:
+            messagebox.showwarning(
+                "Keine Dateien",
+                f"Im gewählten Ordner wurden keine .txt-Dateien gefunden:\n{folder}",
+            )
+            return
+
+        n_files = len(txt_files)
+        confirmed = messagebox.askyesno(
+            "Batch-Verarbeitung",
+            f"{n_files} .txt-Datei{'en' if n_files != 1 else ''} gefunden.\n\n"
+            "Alle anonymisieren?\n\n"
+            "Ausgabe: <dateiname>_anon.txt (im gleichen Ordner)",
+        )
+        if not confirmed:
+            return
+
+        entity_types = self._get_entity_types()
+
+        # UI sperren während der Verarbeitung
+        self.btn_analyse.config(state=tk.DISABLED)
+        self.btn_batch.config(state=tk.DISABLED)
+        self.btn_open.config(state=tk.DISABLED)
+        self._progress_start(indeterminate=False, maximum=n_files)
+        self.status_var.set(f"Batch-Verarbeitung gestartet… (0/{n_files})")
+
+        def run():
+            done = 0
+            errors = 0
+            for i, txt_path in enumerate(txt_files, 1):
+                # Überspringe bereits anonymisierte Dateien
+                if txt_path.stem.endswith("_anon"):
+                    self.root.after(0, lambda p=txt_path, idx=i: self.status_var.set(
+                        f"Übersprungen: {p.name} ({idx}/{n_files})"
+                    ))
+                    self.root.after(0, lambda v=i: self._set_progress(v))
+                    continue
+
+                self.root.after(0, lambda p=txt_path, idx=i: self.status_var.set(
+                    f"Verarbeite: {p.name} ({idx}/{n_files})"
+                ))
+
+                try:
+                    text = txt_path.read_text(encoding="utf-8")
+                    if text.strip():
+                        result, _ = anonymise(text, self.nlp, entity_types)
+                        out_path = txt_path.with_stem(txt_path.stem + "_anon")
+                        out_path.write_text(result, encoding="utf-8")
+                        done += 1
+                except Exception:
+                    errors += 1
+
+                self.root.after(0, lambda v=i: self._set_progress(v))
+
+            self.root.after(0, lambda: self._on_batch_done(done, errors, n_files))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_batch_done(self, done: int, errors: int, total: int):
+        """Wird im Haupt-Thread nach Abschluss der Batch-Verarbeitung aufgerufen."""
+        self._progress_stop()
+        self.btn_analyse.config(state=tk.NORMAL)
+        self.btn_batch.config(state=tk.NORMAL)
+        self.btn_open.config(state=tk.NORMAL)
+
+        msg = f"{done} Datei{'en' if done != 1 else ''} anonymisiert."
+        if errors:
+            msg += (
+                f"\n{errors} Datei{'en' if errors != 1 else ''} "
+                f"konnte{'n' if errors != 1 else ''} nicht verarbeitet werden."
+            )
+
+        self.status_var.set(f"Batch abgeschlossen: {done}/{total} Dateien anonymisiert.")
+        messagebox.showinfo("Batch abgeschlossen", msg)
 
     # ── Datei-Operationen ──────────────────────────────────────────────────────
 
