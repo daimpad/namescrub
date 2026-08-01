@@ -306,15 +306,25 @@ export function classify(token, index, tokens, sentenceStarts) {
   if (PARTICLES.has(lower)) return 'skip'
   if (LEGAL_FORMS.has(lower)) return 'skip'
   if (KNOWN_NON_PERSONS.has(lower)) return 'word'
-  if (isAbbreviation(clean)) return 'skip'
 
   const firstLetter = token.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
   const startsUpper = /^[A-ZÄÖÜ]$/.test(firstLetter)
 
-  // Capitalised word in an unbroken chain behind an honorific
-  if (startsUpper && afterHonorific(tokens, index)) return 'honorific-name'
+  // Case-preserving strip — normalise() lowercases and would blind the
+  // uppercase abbreviation test (MFG, USA, DSGVO).
+  const rawClean = token
+    .replace(/^[«»„"'"'()\[\]{}<>!?,;:.…–—\-\/\\]+/u, '')
+    .replace(/[«»„"'"'()\[\]{}<>!?,;:.…–—\-\/\\]+$/u, '')
+  const isAbbrev = isAbbreviation(rawClean)
 
   const preceding = prevWords(tokens, index, 8)
+
+  // Capitalised word in an unbroken chain behind an honorific.
+  // Abbreviation-like tokens (all-caps) qualify only DIRECTLY after the
+  // honorific: "Frau MÜLLER" yes — "Frau Müller von der IHK" must not
+  // absorb "IHK" through the particle chain.
+  if (startsUpper && afterHonorific(tokens, index) &&
+      (!isAbbrev || (preceding.length && HONORIFICS.has(preceding[0])))) return 'honorific-name'
 
   // Positive first-name match — strong signal regardless of dictionary
   if (firstNames && firstNames.has(lower) && startsUpper) return 'name'
@@ -331,6 +341,11 @@ export function classify(token, index, tokens, sentenceStarts) {
     const stem = lower.slice(0, -1)
     if ((firstNames && firstNames.has(stem)) || COMMON_SURNAMES.has(stem)) return 'name'
   }
+
+  // All-caps / dotted abbreviations (MFG, USA, z.B., DSGVO) → skip.
+  // Runs AFTER the name-list checks so that ALL-CAPS names from the
+  // lists (ANNA, SCHMIDT) are still recognised.
+  if (isAbbrev) return 'skip'
 
   // Salutation context: "Hallo. Behrang hier." — rescues names at sentence
   // start after a greeting; dict words stay words ("Hallo Welt").
@@ -434,6 +449,26 @@ const DATE_RE = /\b\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})\b/g
 // German street addresses: "Musterstraße 12", "Bahnhofstr. 5a", "Am Markt 3, 10115 Berlin"
 const ADDRESS_RE = /[A-ZÄÖÜ][a-zäöüßA-ZÄÖÜ]+(?:straße|strasse|str\.|gasse|weg|allee|platz|ring|damm|chaussee|ufer|steig|pfad|stieg|promenade)\s+\d+[a-zA-Z]?(?:,\s*\d{5}\s+[A-ZÄÖÜ][a-zäöüß]+)?/g
 
+// IBAN candidates, compact ("DE89370400440532013000") or grouped
+// ("DE89 3704 0044 0532 0130 00"). Candidates are verified with the
+// MOD-97 checksum, so false positives are practically impossible.
+const IBAN_RE = /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{2,4}){3,8}\b/g
+
+/**
+ * ISO 13616 MOD-97 check: rearrange, map letters A→10…Z→35, remainder 1.
+ */
+export function isValidIban(candidate) {
+  const iban = candidate.replace(/\s+/g, '').toUpperCase()
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false
+  const rearranged = iban.slice(4) + iban.slice(0, 4)
+  let rem = 0
+  for (const ch of rearranged) {
+    const v = ch >= 'A' ? String(ch.charCodeAt(0) - 55) : ch
+    for (const d of v) rem = (rem * 10 + +d) % 97
+  }
+  return rem === 1
+}
+
 /**
  * Pre-processing pass: detect emails, phone numbers, and optionally dates/addresses.
  * Replaces them with unique placeholder markers in the text so they are not
@@ -450,6 +485,19 @@ export function preProcess(text, options = {}) {
 
   for (const m of text.matchAll(EMAIL_RE)) {
     matches.push({ start: m.index, end: m.index + m[0].length, type: 'email', original: m[0] })
+  }
+
+  // IBANs before phones — an IBAN's digit tail must not be eaten as a phone
+  // number. Only checksum-valid candidates are kept; if the greedy match
+  // absorbed a trailing word block, retry once with that block stripped.
+  for (const m of text.matchAll(IBAN_RE)) {
+    let cand = m[0]
+    if (!isValidIban(cand)) {
+      const cut = cand.replace(/ [A-Z0-9]{1,4}$/, '')
+      if (cut === cand || !isValidIban(cut)) continue
+      cand = cut
+    }
+    matches.push({ start: m.index, end: m.index + cand.length, type: 'iban', original: cand })
   }
 
   for (const m of text.matchAll(PHONE_RE)) {
@@ -559,9 +607,7 @@ export function analyse(text, options = {}) {
     if (j === -1) continue
 
     const candidate = result[j]
-    if (candidate.type === 'space' || candidate.type === 'honorific-name' || candidate.type === 'name'
-        || candidate.type === 'email' || candidate.type === 'phone' || candidate.type === 'date'
-        || candidate.type === 'address') continue
+    if (candidate.type !== 'word') continue   // only plain words may be chained
 
     const raw = candidate.text
     const clean = normalise(raw)

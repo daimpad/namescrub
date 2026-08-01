@@ -30,12 +30,14 @@ let dateMap     = new Map()
 let dateCounter = 0
 let addressMap  = new Map()
 let addressCounter = 0
+let ibanMap     = new Map()
+let ibanCounter = 0
 let activePopup = null
 let history = []
 
 // ── Configurable prefix labels ─────────────────────────────────────────────
 
-const PREFIX_DEFAULTS = { name: 'Name', email: 'Email', phone: 'Tel', date: 'Datum', address: 'Adresse' }
+const PREFIX_DEFAULTS = { name: 'Name', email: 'Email', phone: 'Tel', date: 'Datum', address: 'Adresse', iban: 'IBAN' }
 const LS_PREFIX_KEY = 'namescrub_prefixes'
 
 function getPrefix(type) {
@@ -131,6 +133,7 @@ async function analyse() {
   phoneMap = new Map(); phoneCounter = 0
   dateMap = new Map(); dateCounter = 0
   addressMap = new Map(); addressCounter = 0
+  ibanMap = new Map(); ibanCounter = 0
   history = []
   if (downloadBtn) downloadBtn.disabled = true
   renderOutput()
@@ -194,6 +197,11 @@ function getSpecialPlaceholder(text, type) {
     if (!addressMap.has(k)) { addressCounter++; addressMap.set(k, `${getPrefix('address')}-${addressCounter}`) }
     return addressMap.get(k)
   }
+  if (type === 'iban') {
+    const k = text.replace(/\s+/g, '').toUpperCase()   // grouped == compact
+    if (!ibanMap.has(k)) { ibanCounter++; ibanMap.set(k, `${getPrefix('iban')}-${ibanCounter}`) }
+    return ibanMap.get(k)
+  }
   return text
 }
 
@@ -209,6 +217,9 @@ function peekSpecialPlaceholder(text, type) {
   }
   if (type === 'address') {
     const k = text.toLowerCase(); return addressMap.get(k) || `${getPrefix('address')}-${addressCounter + 1}`
+  }
+  if (type === 'iban') {
+    const k = text.replace(/\s+/g, '').toUpperCase(); return ibanMap.get(k) || `${getPrefix('iban')}-${ibanCounter + 1}`
   }
   return text
 }
@@ -247,6 +258,7 @@ const FP_LABELS = {
   'phone': '✓ Kein Telefon',
   'date': '✓ Kein Datum',
   'address': '✓ Keine Adresse',
+  'iban': '✓ Keine IBAN',
 }
 
 function showPopup(span, idx) {
@@ -294,11 +306,16 @@ function showPopup(span, idx) {
   span.style.position = 'relative'
   span.appendChild(popup)
   activePopup = popup
+
+  // Flip the popup to right-aligned when it would overflow the output panel
+  const pr = popup.getBoundingClientRect()
+  const or = outputEl.getBoundingClientRect()
+  if (pr.right > or.right) popup.classList.add('flip')
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
-const SPECIAL_TYPES = new Set(['email', 'phone', 'date', 'address'])
+const SPECIAL_TYPES = new Set(['email', 'phone', 'date', 'address', 'iban'])
 
 // Clickable & keyboard-focusable token span (Enter/Space opens the popup)
 function makeTokenSpan(className, text, idx) {
@@ -322,6 +339,7 @@ function renderOutput() {
   let phoneCount = 0
   let dateCount = 0
   let addressCount = 0
+  let ibanCount = 0
 
   currentTokens.forEach((tok, idx) => {
     if (tok.type === 'space') {
@@ -338,6 +356,7 @@ function renderOutput() {
       else if (tok.type === 'phone') phoneCount++
       else if (tok.type === 'date') dateCount++
       else if (tok.type === 'address') addressCount++
+      else if (tok.type === 'iban') ibanCount++
       outputEl.appendChild(makeTokenSpan(`token ${tok.type}`, tok.text, idx))
     } else if (tok.type === 'replaced') {
       const span = document.createElement('span')
@@ -350,7 +369,7 @@ function renderOutput() {
   })
 
   const total = currentTokens.filter(t => t.type !== 'space').length
-  const totalSpecial = nameCount + emailCount + phoneCount + dateCount + addressCount
+  const totalSpecial = nameCount + emailCount + phoneCount + dateCount + addressCount + ibanCount
 
   if (totalSpecial === 0) {
     statsEl.textContent = `Nichts gefunden (${total} Tokens)`
@@ -361,6 +380,7 @@ function renderOutput() {
     if (phoneCount > 0) parts.push(`${phoneCount} Telefon${phoneCount !== 1 ? 'nummern' : 'nummer'}`)
     if (dateCount > 0) parts.push(`${dateCount} Datum${dateCount !== 1 ? 'sangaben' : ''}`)
     if (addressCount > 0) parts.push(`${addressCount} Adresse${addressCount !== 1 ? 'n' : ''}`)
+    if (ibanCount > 0) parts.push(`${ibanCount} IBAN${ibanCount !== 1 ? 's' : ''}`)
     statsEl.textContent = parts.join(', ') + ` von ${total} Tokens`
   }
 
