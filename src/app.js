@@ -140,6 +140,7 @@ async function analyse() {
 
 function pushHistory() {
   history.push(currentTokens.map(t => ({ ...t })))
+  if (history.length > 50) history.shift()
 }
 
 function undo() {
@@ -299,6 +300,21 @@ function showPopup(span, idx) {
 
 const SPECIAL_TYPES = new Set(['email', 'phone', 'date', 'address'])
 
+// Clickable & keyboard-focusable token span (Enter/Space opens the popup)
+function makeTokenSpan(className, text, idx) {
+  const span = document.createElement('span')
+  span.className = className
+  span.textContent = text
+  span.title = 'Klicken für Optionen'
+  span.tabIndex = 0
+  span.setAttribute('role', 'button')
+  span.addEventListener('click', (e) => { e.stopPropagation(); showPopup(span, idx) })
+  span.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); showPopup(span, idx) }
+  })
+  return span
+}
+
 function renderOutput() {
   outputEl.innerHTML = ''
   let nameCount = 0
@@ -315,23 +331,14 @@ function renderOutput() {
 
     if (tok.type === 'name' || tok.type === 'honorific-name') {
       nameCount++
-      const span = document.createElement('span')
-      span.className = tok.type === 'honorific-name' ? 'token name honorific' : 'token name'
-      span.textContent = tok.text
-      span.title = 'Klicken für Optionen'
-      span.addEventListener('click', (e) => { e.stopPropagation(); showPopup(span, idx) })
-      outputEl.appendChild(span)
+      const cls = tok.type === 'honorific-name' ? 'token name honorific' : 'token name'
+      outputEl.appendChild(makeTokenSpan(cls, tok.text, idx))
     } else if (SPECIAL_TYPES.has(tok.type)) {
       if (tok.type === 'email') emailCount++
       else if (tok.type === 'phone') phoneCount++
       else if (tok.type === 'date') dateCount++
       else if (tok.type === 'address') addressCount++
-      const span = document.createElement('span')
-      span.className = `token ${tok.type}`
-      span.textContent = tok.text
-      span.title = 'Klicken für Optionen'
-      span.addEventListener('click', (e) => { e.stopPropagation(); showPopup(span, idx) })
-      outputEl.appendChild(span)
+      outputEl.appendChild(makeTokenSpan(`token ${tok.type}`, tok.text, idx))
     } else if (tok.type === 'replaced') {
       const span = document.createElement('span')
       span.className = 'token replaced'
@@ -387,6 +394,7 @@ function purge() {
 // ── Copy ───────────────────────────────────────────────────────────────────
 
 async function copyToClipboard() {
+  closePopup()   // an open popup would leak its button labels into innerText
   const text = outputEl.innerText
   try {
     await navigator.clipboard.writeText(text)
@@ -400,6 +408,7 @@ async function copyToClipboard() {
 // ── Download ───────────────────────────────────────────────────────────────
 
 function downloadResult() {
+  closePopup()   // an open popup would leak its button labels into innerText
   const text = outputEl.innerText
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -417,8 +426,18 @@ function loadFile(file) {
     return
   }
   const reader = new FileReader()
-  reader.onload = (e) => { inputEl.value = e.target.result; setStatus('Datei geladen.', 'ready') }
-  reader.readAsText(file, 'utf-8')
+  reader.onload = (e) => {
+    let text
+    try {
+      // UTF-8 zuerst; deutsche Windows-Dateien sind oft cp1252 ("M�ller"-Fix)
+      text = new TextDecoder('utf-8', { fatal: true }).decode(e.target.result)
+    } catch {
+      text = new TextDecoder('windows-1252').decode(e.target.result)
+    }
+    inputEl.value = text
+    setStatus('Datei geladen.', 'ready')
+  }
+  reader.readAsArrayBuffer(file)
 }
 
 // ── Status helper ──────────────────────────────────────────────────────────
@@ -452,7 +471,10 @@ btnPlusClose?.addEventListener('click', closePlusModal)
 plusBackdrop?.addEventListener('click', closePlusModal)
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && plusModal && !plusModal.hidden) closePlusModal()
+  if (e.key === 'Escape') {
+    if (plusModal && !plusModal.hidden) closePlusModal()
+    else closePopup()
+  }
   if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); undo() }
 })
 
