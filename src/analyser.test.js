@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { setDict, setFirstNames, analyse, preProcess, normalise, isAbbreviation, tokenise } from './analyser.js'
+import { setDict, setFirstNames, analyse, preProcess, normalise, isAbbreviation, tokenise, isValidIban } from './analyser.js'
 
 // Minimal test dictionary — common German words that should NOT be classified as names
 const TEST_DICT = new Set([
@@ -257,6 +257,34 @@ describe('recall improvements', () => {
   })
 })
 
+describe('IBAN detection', () => {
+  it('validates a correct German IBAN', () => {
+    expect(isValidIban('DE89370400440532013000')).toBe(true)
+    expect(isValidIban('DE89 3704 0044 0532 0130 00')).toBe(true)
+  })
+
+  it('rejects a wrong checksum', () => {
+    expect(isValidIban('DE89370400440532013001')).toBe(false)
+  })
+
+  it('detects a compact IBAN in text', () => {
+    const tokens = analyse('Bitte an DE89370400440532013000 überweisen.', {})
+    const iban = tokens.find(t => t.type === 'iban')
+    expect(iban?.text).toBe('DE89370400440532013000')
+  })
+
+  it('detects a grouped IBAN in text', () => {
+    const tokens = analyse('Konto: DE89 3704 0044 0532 0130 00 bei der Bank.', {})
+    const iban = tokens.find(t => t.type === 'iban')
+    expect(iban?.text).toContain('DE89 3704')
+  })
+
+  it('does not flag IBAN-like strings with bad checksum', () => {
+    const tokens = analyse('Referenz DE00123456781234567890 im Betreff.', {})
+    expect(tokens.some(t => t.type === 'iban')).toBe(false)
+  })
+})
+
 describe('honorific chain precision', () => {
   it('chain breaks at lowercase words after the name', () => {
     const tokens = analyse('Frau Weber, vielen Dank für alles.', {})
@@ -278,5 +306,29 @@ describe('honorific chain precision', () => {
   it('lowercase token after honorific stays untouched', () => {
     const tokens = analyse('Die Frau dort ist nett.', {})
     expect(tokens.find(t => t.text === 'dort')?.type).toBe('word')
+  })
+})
+
+describe('abbreviation handling', () => {
+  it('all-caps acronyms are skipped, not names', () => {
+    const tokens = analyse('MFG Zorbek. Die DSGVO gilt.', {})
+    expect(tokens.find(t => t.text === 'MFG')?.type).toBe('skip')
+    expect(tokens.find(t => t.text.startsWith('DSGVO'))?.type).toBe('skip')
+  })
+
+  it('ALL-CAPS name from the surname list is still a name', () => {
+    const tokens = analyse('Ich traf MÜLLER gestern.', {})
+    expect(tokens.find(t => t.text === 'MÜLLER')?.type).toBe('name')
+  })
+
+  it('acronym behind honorific particle chain is not chained', () => {
+    const tokens = analyse('Frau Müller von der IHK spricht.', {})
+    const ihk = tokens.find(t => t.text.startsWith('IHK'))
+    expect(ihk?.type).toBe('skip')
+  })
+
+  it('ALL-CAPS token directly after honorific is a name', () => {
+    const tokens = analyse('Kontakt: Frau MEIER bitte anrufen.', {})
+    expect(tokens.find(t => t.text === 'MEIER')?.type).toBe('honorific-name')
   })
 })
