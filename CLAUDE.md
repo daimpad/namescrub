@@ -54,7 +54,7 @@ Branch-Konvention: Feature-Branches, Merge in `main`
 #### Build (`package.json`, `scripts/`)
 - `npm run build`: Dictionary-Build + Vornamen-Build + Vite-Build
 - `scripts/build-dictionary.js`: Lädt `enz/german-wordlist`, erzeugt `public/dictionary.json`
-- `scripts/build-firstnames.js`: Hardcodierte 810 Vornamen → `public/firstnames.json`
+- `scripts/build-firstnames.js`: Kuratierte ~2.000 Vornamen (DE, TR, AR, Slawisch, ES/PT, FA, Asiatisch, NL/Skandinavisch, EN) mit Kollisions-Blockliste → `public/firstnames.json`
 
 #### Deployment (`public/.htaccess`, `dist/.htaccess`)
 - Apache-Regeln: Asset-Extension Early-Exit (verhindert MIME-Fehler bei SPA-Fallback)
@@ -112,11 +112,13 @@ namescrub/
 ├── index.html                  Haupt-HTML (SPA)
 ├── src/
 │   ├── app.js                  UI-Logik, Modal, Popup, Mapping
-│   ├── worker.js               5-Pass-NER-Algorithmus (Web Worker)
+│   ├── analyser.js             Multi-Pass-NER-Algorithmus (pure Funktionen)
+│   ├── analyser.test.js        Vitest-Tests
+│   ├── worker.js               Dünner Web-Worker-Wrapper um analyser.js
 │   └── style.css               Gesamtes CSS inkl. Modal
 ├── public/
 │   ├── dictionary.json         675k deutsche Wörter (generiert)
-│   ├── firstnames.json         810 Vornamen (generiert)
+│   ├── firstnames.json         ~2.000 Vornamen (generiert)
 │   ├── namescrub_logo_header.png  Logo für Desktop-GUI
 │   ├── namescrub_logo_long.svg    Logo für Web-Header
 │   └── .htaccess               Apache-Regeln
@@ -141,7 +143,6 @@ namescrub/
 - **Web: Organisationsnamen** werden nicht erkannt (nur `KNOWN_NON_PERSONS`-Ausschluss bekannter Marken)
 - **Keine Python-Tests** — `namescrub.py` / `namescrub_gui.py` sind ungetestet (Web hat Vitest)
 - **Kein Web-Deploy-CI** — `dist/` wird manuell auf Plesk deployt (Release-Workflow existiert nur für Desktop-Binaries)
-- **Popup am rechten Rand** kann aus dem Viewport ragen (kein Overflow-Flipping)
 - **Präfix-Änderung mitten in der Session** wirkt nur auf neu vergebene Platzhalter — bereits vergebene behalten das alte Präfix bis zur nächsten Analyse
 
 ### Evaluierte Bibliotheken (Stand 2026-08)
@@ -161,7 +162,6 @@ namescrub/
 - [x] **Telefonnummern** erkennen (`+49 123 456789` → `Tel-1`)
 - [x] **Datumsangaben** optional erkennen (`12.03.2024` → `Datum-1`)
 - [x] **Konfigurierbare Labels** — User kann Platzhalter-Präfix selbst wählen (localStorage)
-- [ ] **Popup-Overflow-Flipping** am rechten Viewport-Rand
 
 #### NameScrub+ Desktop
 - [x] **GitHub Releases** mit vorgefertigten Executables (`.github/workflows/release.yml`, Tag `v*.*.*`)
