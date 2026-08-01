@@ -100,11 +100,16 @@ jobs:
 
       - name: Resolve tag name
         id: tag
+        # Untrusted values (dispatch input, ref name) are passed via env vars,
+        # never interpolated into the script — prevents shell injection.
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "name=$INPUT_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "name=$REF_NAME" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download all artifacts

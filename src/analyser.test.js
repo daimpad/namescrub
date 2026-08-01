@@ -12,6 +12,7 @@ const TEST_DICT = new Set([
   'meldete', 'rekordgewinn', 'trafen', 'sich', 'berichtete',
   // Words that happen to also be dict entries — must not spread as names via Pass 3
   'sommer', 'winter', 'vogel', 'firma',
+  'wärme', 'hund', 'kaputt', 'gern', 'vielen', 'dank', 'alles',
 ])
 
 const TEST_NAMES = new Set([
@@ -199,5 +200,83 @@ describe('analyse — address detection', () => {
     const addr = tokens.find(t => t.type === 'address')
     expect(addr?.text).toContain('Bahnhofstraße 5')
     expect(addr?.text).toContain('10115 Berlin')
+  })
+
+  it('Pass 2: address after a name stays an address token', () => {
+    const tokens = analyse('Frau Müller, Musterstraße 12, kommt morgen.', { detectAddresses: true })
+    const addr = tokens.find(t => t.type === 'address')
+    expect(addr?.text).toContain('Musterstraße 12')
+  })
+})
+
+describe('recall improvements', () => {
+  it('genitive of a first name at sentence start', () => {
+    const tokens = analyse('Annas Auto ist kaputt.', {})
+    expect(tokens.find(t => t.text === 'Annas')?.type).toBe('name')
+  })
+
+  it('genitive of a common surname at sentence start', () => {
+    const tokens = analyse('Schmidts Hund ist hier.', {})
+    expect(tokens.find(t => t.text === 'Schmidts')?.type).toBe('name')
+  })
+
+  it('noun genitive with article is NOT a name', () => {
+    const tokens = analyse('Wir lieben die Wärme des Sommers hier.', {})
+    expect(tokens.find(t => t.text === 'Sommers')?.type).not.toBe('name')
+  })
+
+  it('greeting rescues unknown name at sentence start', () => {
+    const tokens = analyse('Hallo. Zorlu hier.', {})
+    expect(tokens.find(t => t.text === 'Zorlu')?.type).toBe('name')
+  })
+
+  it('greeting does not flag dict words', () => {
+    const tokens = analyse('Hallo. Welt ist schön.', {})
+    expect(tokens.find(t => t.text === 'Welt')?.type).not.toBe('name')
+  })
+
+  it('und-pair rescues unknown name at sentence start', () => {
+    const tokens = analyse('Xenia und Thomas kommen morgen.', {})
+    expect(tokens.find(t => t.text === 'Xenia')?.type).toBe('name')
+  })
+
+  it('hyphenated surname pair with dict-word parts', () => {
+    const tokens = analyse('Das Urteil von Sommer-Winter ist da.', {})
+    expect(tokens.find(t => t.text === 'Sommer-Winter')?.type).toBe('name')
+  })
+
+  it('final propagation spreads genitive of late-promoted names', () => {
+    const tokens = analyse('Behrang schreibt gern. Behrangs Auto ist kaputt.', {})
+    expect(tokens.find(t => t.text === 'Behrang')?.type).toBe('name')
+    expect(tokens.find(t => t.text === 'Behrangs')?.type).toBe('name')
+  })
+
+  it('schmidt is recognised as a common surname', () => {
+    const tokens = analyse('Herr Schmidt und Frau Weber sprechen.', {})
+    expect(tokens.find(t => t.text === 'Schmidt')?.type).toBe('honorific-name')
+  })
+})
+
+describe('honorific chain precision', () => {
+  it('chain breaks at lowercase words after the name', () => {
+    const tokens = analyse('Frau Weber, vielen Dank für alles.', {})
+    expect(tokens.find(t => t.text.startsWith('Weber'))?.type).toBe('honorific-name')
+    expect(tokens.find(t => t.text === 'vielen')?.type).toBe('word')
+    expect(tokens.find(t => t.text === 'Dank')?.type).toBe('word')
+  })
+
+  it('chain survives long academic title sequences', () => {
+    const tokens = analyse('Prof. Dr. med. Dr. h.c. mult. Zorbek spricht heute.', {})
+    expect(tokens.find(t => t.text === 'Zorbek')?.type).toBe('honorific-name')
+  })
+
+  it('herrn (dative) counts as honorific', () => {
+    const tokens = analyse('Ich sprach mit Herrn Zorbek darüber.', {})
+    expect(tokens.find(t => t.text === 'Zorbek')?.type).toBe('honorific-name')
+  })
+
+  it('lowercase token after honorific stays untouched', () => {
+    const tokens = analyse('Die Frau dort ist nett.', {})
+    expect(tokens.find(t => t.text === 'dort')?.type).toBe('word')
   })
 })

@@ -5,7 +5,7 @@
 
 export const HONORIFICS = new Set([
   // German titles
-  'herr', 'frau', 'fräulein',
+  'herr', 'herrn', 'frau', 'fräulein',
   'dr', 'prof', 'professor', 'professorin',
   'doktor', 'doktorin',
   'mag', 'ing', 'dipl',
@@ -42,6 +42,34 @@ export const COMMON_SURNAMES = new Set([
   'keller', 'frank', 'berger', 'winkler', 'roth', 'beck', 'baumann',
   'schuster', 'simon', 'böhm', 'winter', 'kraus', 'kramer', 'ritter',
   'engel', 'stern', 'sommer', 'graf', 'kurz', 'sauer', 'gross', 'groß',
+  'schmidt', 'wolff', 'schulte', 'schumacher', 'seidel', 'brandt', 'haas',
+  'arnold', 'otto', 'ludwig', 'franke', 'albrecht', 'günther', 'busch',
+  'sander', 'voigt', 'bergmann', 'pohl', 'jäger', 'thiel', 'wenzel',
+  'schreiber', 'vogt', 'friedrich', 'ziegler', 'kuhn', 'pfeiffer',
+  'dietrich', 'seifert', 'marx', 'heinrich', 'michels', 'kruse', 'dietz',
+  'barth', 'krämer', 'förster', 'kaufmann', 'ackermann', 'gärtner',
+  'wirth', 'brauer', 'fink', 'adler', 'lorenz', 'hermann', 'ebert',
+  'eckert', 'fiedler', 'gerlach', 'grimm', 'haase', 'heine', 'hennig',
+  'henke', 'jahn', 'janssen', 'jansen', 'kunze', 'lindemann', 'mahler',
+  'menzel', 'merkel', 'mohr', 'naumann', 'nolte', 'petersen', 'pfeifer',
+  'reimann', 'reinhardt', 'reuter', 'riedel', 'rudolph', 'schilling',
+  'schindler', 'scholz', 'schwab', 'seitz', 'siebert', 'steffen',
+  'thiele', 'ullrich', 'ulrich', 'wendt', 'wiegand', 'wilke', 'witt',
+  'wolter',
+])
+
+// Salutation words — a capitalised token directly after one of these is
+// almost always a name ("Hallo Behrang", "Liebe Zeynep", "Viele Grüße Cem").
+export const GREETINGS = new Set([
+  'hallo', 'hi', 'hey', 'moin', 'servus', 'grüezi', 'tschüss',
+  'liebe', 'lieber', 'liebes', 'geehrte', 'geehrter', 'werte', 'werter',
+  'grüße', 'gruß', 'grüßen', 'grüsse', 'gruss',
+])
+
+// Genitive articles/pronouns — "des Sommers" is a noun genitive, not a name.
+const GENITIVE_BLOCKERS = new Set([
+  'des', 'eines', 'dieses', 'jenes', 'jedes', 'meines', 'deines',
+  'seines', 'ihres', 'unseres', 'eures', 'keines',
 ])
 
 // Word endings strongly associated with German surnames.
@@ -80,6 +108,7 @@ export const SENT_ABBREV = new Set([
   'nr', 'str', 'tel', 'fax', 'abs', 'art', 'abb', 'ca', 'ggf',
   'inkl', 'exkl', 'evtl', 'zzgl', 'mwst', 'bsp', 'vgl', 'usw',
   'bzw', 'etc', 'zb', 'dh', 'ua', 'oa', 'ff', 'ibd',
+  'med', 'mult', 'habil', 'rer', 'nat', 'phil', 'jur', 'iur',
   'jan', 'feb', 'mär', 'mar', 'apr', 'jun', 'jul',
   'aug', 'sep', 'sept', 'okt', 'nov', 'dez',
 ])
@@ -226,6 +255,41 @@ export function prevWords(tokens, index, limit = 8) {
   return words
 }
 
+// Academic title fragments that appear between honorific and name
+// ("Prof. Dr. med. Dr. h.c. mult. Meier") — transparent for the chain walk.
+const TITLE_PARTS = new Set([
+  'med', 'mult', 'habil', 'rer', 'nat', 'phil', 'jur', 'iur',
+  'dent', 'vet', 'oec', 'pol', 'h.c', 'hc', 'e.h', 'eh', 'c', 'h',
+])
+
+/**
+ * True when `tokens[index]` sits in an UNBROKEN chain behind an honorific:
+ * only other honorifics, title fragments, particles and capitalised tokens
+ * may lie in between. Lowercase words and clause punctuation break the
+ * chain — "Frau Dr. Weber, vielen Dank" must not flag "vielen" or "Dank".
+ */
+export function afterHonorific(tokens, index, limit = 8) {
+  let steps = 0
+  for (let i = index - 1; i >= 0 && steps < limit; i--) {
+    const raw = tokens[i]
+    if (!raw.trim()) continue
+    steps++
+    const w = normalise(raw)
+    if (!w) return false                                   // bare punctuation
+    if (HONORIFICS.has(w)) return !/[,;:!?…]\s*$/.test(raw)
+    if (TITLE_PARTS.has(w) || TITLE_PARTS.has(w.replace(/\./g, ''))) {
+      if (/[,;:!?…]\s*$/.test(raw)) return false
+      continue
+    }
+    if (/[.,;:!?…]\s*$/.test(raw)) return false            // clause/sentence end
+    if (PARTICLES.has(w)) continue
+    const fl = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
+    if (/^[A-ZÄÖÜ]$/.test(fl)) continue                    // multi-part name chain
+    return false                                           // lowercase word breaks it
+  }
+  return false
+}
+
 /**
  * Pass 1: classify a single token.
  * Returns: 'name' | 'honorific-name' | 'word' | 'skip'
@@ -244,12 +308,13 @@ export function classify(token, index, tokens, sentenceStarts) {
   if (KNOWN_NON_PERSONS.has(lower)) return 'word'
   if (isAbbreviation(clean)) return 'skip'
 
-  // Word after an honorific — limit raised to 8 for multi-title chains
-  const preceding = prevWords(tokens, index, 8)
-  if (preceding.some(w => HONORIFICS.has(w))) return 'honorific-name'
-
   const firstLetter = token.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
   const startsUpper = /^[A-ZÄÖÜ]$/.test(firstLetter)
+
+  // Capitalised word in an unbroken chain behind an honorific
+  if (startsUpper && afterHonorific(tokens, index)) return 'honorific-name'
+
+  const preceding = prevWords(tokens, index, 8)
 
   // Positive first-name match — strong signal regardless of dictionary
   if (firstNames && firstNames.has(lower) && startsUpper) return 'name'
@@ -257,15 +322,34 @@ export function classify(token, index, tokens, sentenceStarts) {
   // Known surname overrides dict
   if (COMMON_SURNAMES.has(lower) && startsUpper) return 'name'
 
-  // Hyphenated names: Hans-Peter, Karl-Heinz, Marie-Louise, Anna-Lena.
-  // Both parts must start uppercase, consist only of letters, and neither
-  // part may be a common dictionary word (rules out Ex-Minister, E-Mail …).
+  // Genitive forms of known names: "Annas Buch", "Müllers Auto".
+  // Must run before the dictionary check — inflection stripping would
+  // otherwise resolve "müllers" to the dict word "müller". Guarded against
+  // noun genitives with article ("des Sommers", "eines Fischers").
+  if (startsUpper && lower.length >= 4 && lower.endsWith('s') &&
+      !(preceding.length && GENITIVE_BLOCKERS.has(preceding[0]))) {
+    const stem = lower.slice(0, -1)
+    if ((firstNames && firstNames.has(stem)) || COMMON_SURNAMES.has(stem)) return 'name'
+  }
+
+  // Salutation context: "Hallo. Behrang hier." — rescues names at sentence
+  // start after a greeting; dict words stay words ("Hallo Welt").
+  if (startsUpper && preceding.length && GREETINGS.has(preceding[0]) &&
+      !inDict(lower) && !WORD_SUFFIX_RE.test(lower)) return 'name'
+
+  // Hyphenated names: Hans-Peter, Karl-Heinz, Müller-Schmidt.
+  // Both parts must start uppercase and consist only of letters; each part
+  // must be unknown to the dictionary OR itself a known name — this keeps
+  // Ex-Minister/E-Mail out but lets Müller-Lüdenscheidt through.
   if (token.includes('-')) {
     const parts = token.split('-')
     if (
       parts.length === 2 &&
       parts.every(p => /^[A-ZÄÖÜ][a-zäöüß]{1,}$/.test(p.trim())) &&
-      parts.every(p => !inDict(p.trim().toLowerCase()))
+      parts.every(p => {
+        const pl = p.trim().toLowerCase()
+        return !inDict(pl) || COMMON_SURNAMES.has(pl) || (firstNames && firstNames.has(pl))
+      })
     ) return 'name'
   }
 
@@ -411,6 +495,31 @@ export function preProcess(text, options = {}) {
 }
 
 /**
+ * Spread confirmed names to all other occurrences in the text, including
+ * genitive forms ("Behrang" → "Behrangs"). Keys are only propagated when
+ * they are not ordinary dictionary words (or are known surnames) so that
+ * common nouns never spread. Safe to run multiple times.
+ */
+export function propagateNames(result) {
+  const nameKeys = new Set()
+  for (const tok of result) {
+    if (tok.type === 'name' || tok.type === 'honorific-name') {
+      const key = normalise(tok.text).toLowerCase()
+      if (key.length >= 3 && (!inDict(key) || COMMON_SURNAMES.has(key))) nameKeys.add(key)
+    }
+  }
+  if (nameKeys.size === 0) return
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type !== 'word') continue
+    const key = normalise(result[i].text).toLowerCase()
+    if (nameKeys.has(key) ||
+        (key.length >= 4 && key.endsWith('s') && nameKeys.has(key.slice(0, -1)))) {
+      result[i] = { ...result[i], type: 'name' }
+    }
+  }
+}
+
+/**
  * Main analyse function.
  * Accepts text and options { detectDates, detectAddresses } and returns an array of token objects.
  */
@@ -451,7 +560,8 @@ export function analyse(text, options = {}) {
 
     const candidate = result[j]
     if (candidate.type === 'space' || candidate.type === 'honorific-name' || candidate.type === 'name'
-        || candidate.type === 'email' || candidate.type === 'phone' || candidate.type === 'date') continue
+        || candidate.type === 'email' || candidate.type === 'phone' || candidate.type === 'date'
+        || candidate.type === 'address') continue
 
     const raw = candidate.text
     const clean = normalise(raw)
@@ -465,22 +575,7 @@ export function analyse(text, options = {}) {
   }
 
   // ── Pass 3: consistency propagation ──────────────────────────────────
-  const nameKeys = new Set()
-  for (const tok of result) {
-    if (tok.type === 'name' || tok.type === 'honorific-name') {
-      const key = normalise(tok.text).toLowerCase()
-      if (key.length >= 3 && (!inDict(key) || COMMON_SURNAMES.has(key))) nameKeys.add(key)
-    }
-  }
-
-  if (nameKeys.size > 0) {
-    for (let i = 0; i < result.length; i++) {
-      if (result[i].type === 'word') {
-        const key = normalise(result[i].text).toLowerCase()
-        if (nameKeys.has(key)) result[i] = { ...result[i], type: 'name' }
-      }
-    }
-  }
+  propagateNames(result)
 
   // ── Pass 4: bilateral context (look forward) ──────────────────────────
   for (let i = 0; i < result.length; i++) {
@@ -495,6 +590,29 @@ export function analyse(text, options = {}) {
     const j = nextContentToken(result, i, 1)
     if (j === -1) continue
     if (result[j].type === 'name' || result[j].type === 'honorific-name') {
+      result[i] = { ...result[i], type: 'name' }
+    }
+  }
+
+  // ── Pass 4b: coordination pairs ───────────────────────────────────────
+  // "Xenia und Thomas kamen" — an unknown capitalised word coordinated with
+  // a recognised name via und/oder is itself a name. Rescues names at
+  // sentence start that the conservative guard held back.
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type !== 'word') continue
+    const raw = result[i].text
+    const fl = raw.replace(/^[^a-zA-ZäöüÄÖÜß]+/, '')[0] || ''
+    if (!/^[A-ZÄÖÜ]$/.test(fl)) continue
+    const lower = normalise(raw).toLowerCase()
+    if (inDict(lower) || WORD_SUFFIX_RE.test(lower) || KNOWN_NON_PERSONS.has(lower)) continue
+
+    const j = nextContentToken(result, i, 1)
+    if (j === -1) continue
+    const conj = normalise(result[j].text).toLowerCase()
+    if (conj !== 'und' && conj !== 'oder') continue
+    const k = nextContentToken(result, j, 1)
+    if (k === -1) continue
+    if (result[k].type === 'name' || result[k].type === 'honorific-name') {
       result[i] = { ...result[i], type: 'name' }
     }
   }
@@ -521,6 +639,11 @@ export function analyse(text, options = {}) {
       result[i] = { ...result[i], type: 'name' }
     }
   }
+
+  // ── Final pass: propagate late promotions ─────────────────────────────
+  // Passes 4/4b/5 can promote tokens after Pass 3 already ran; a second
+  // propagation spreads those (incl. genitive forms) across the text.
+  propagateNames(result)
 
   return result
 }

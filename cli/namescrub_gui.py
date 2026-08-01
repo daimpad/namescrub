@@ -19,6 +19,15 @@ sys.path.insert(0, str(_HERE))
 # Logo-Pfad (public/namescrub_logo_header.png, relativ zum Repo-Root)
 _LOGO_PATH = _ROOT / "public" / "namescrub_logo_header.png"
 
+
+def _read_text_flexible(path):
+    """UTF-8 zuerst, dann cp1252 — deutsche Windows-Dateien sind oft nicht UTF-8."""
+    p = Path(path)
+    try:
+        return p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return p.read_text(encoding="cp1252")
+
 try:
     from namescrub import load_model, anonymise, apply_mapping, interactive_review, LABEL_PREFIX
 except ImportError as e:
@@ -384,7 +393,7 @@ class NameScrubApp:
                 ))
 
                 try:
-                    text = txt_path.read_text(encoding="utf-8")
+                    text = _read_text_flexible(txt_path)
                     if text.strip():
                         result, _ = anonymise(text, self.nlp, entity_types)
                         out_path = txt_path.with_stem(txt_path.stem + "_anon")
@@ -431,7 +440,7 @@ class NameScrubApp:
         if not path:
             return
         try:
-            text = Path(path).read_text(encoding="utf-8")
+            text = _read_text_flexible(path)
         except Exception as e:
             messagebox.showerror("Fehler", f"Datei konnte nicht gelesen werden:\n{e}")
             return

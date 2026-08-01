@@ -22,21 +22,25 @@ Branch-Konvention: Feature-Branches, Merge in `main`
 
 ### NameScrub Web (`src/`, `public/`, `index.html`)
 
-#### Erkennung (Web Worker `src/worker.js`)
-- **5-Pass-Algorithmus:**
-  1. Basisklassifikation: Honorifike, Partikel, Rechtsformen, Abkürzungen, Dictionary-Lookup
-  2. Nachname-Chaining: Token nach erkanntem Name → ebenfalls Name
-  3. Konsistenz-Propagierung: Alle Vorkommen eines bestätigten Namens im Text
+#### Erkennung (`src/analyser.js`, dünner Worker-Wrapper `src/worker.js`)
+- **Multi-Pass-Algorithmus:**
+  1. Basisklassifikation: Honorifike, Partikel, Rechtsformen, Abkürzungen, `KNOWN_NON_PERSONS` (Tech-Marken), Dictionary-Lookup, Genitiv-Namen („Annas", „Müllers"), Anrede-Kontext („Hallo X", „Liebe Grüße X"), Bindestrich-Namen
+  2. Nachname-Chaining: Token nach erkanntem Name → ebenfalls Name (E-Mail/Telefon/Datum/Adresse geschützt)
+  3. Konsistenz-Propagierung: Alle Vorkommen eines bestätigten Namens (Genitiv-bewusst, nur Nicht-Dictionary-Keys)
   4. Bilateraler Kontext: Uppercase-Token vor bekanntem Namen
+  4b. Koordinations-Paare: „Xenia und Thomas" → beide Namen (rettet Satzanfänge)
   5. Verb-Kontext: Uppercase-Token direkt vor Verb → Satzanfangs-Namen
+  6. Finale Propagierung: spät beförderte Namen werden textweit verteilt
+- **Pre-Processing** (`preProcess`): E-Mails, Telefonnummern, optional Datumsangaben und Adressen werden vor der Tokenisierung durch Null-Byte-Marker ersetzt
 - **Dictionary:** `enz/german-wordlist`, 675.556 Wörter, explizit ohne Eigennamen, als `Set` für O(1)-Lookup
-- **Vornamenliste:** 810 Vornamen (DE, EN, FR, TR, PL, RU, IT, AR, GR, VN) in `public/firstnames.json`
-- **Wort-Suffix-Filter:** Suffixe wie `-lich`, `-isch`, `-haft`, `-ung`, `-schaft` → kein Name
+- **Vornamenliste:** `public/firstnames.json` (generiert aus `scripts/build-firstnames.js`)
+- **COMMON_SURNAMES:** ~160 häufigste deutsche Nachnamen inkl. Dictionary-Kollisionen (Müller, Schmidt, Jäger …)
+- **Wort-Suffix-Filter:** Suffixe wie `-lich`, `-isch`, `-ung`, `-tion`, `-ität` → kein Name
 - **Compound-Detection:** Zerlegung zusammengesetzter Wörter in 2-3 Teile, Prüfung gegen Dictionary
-- **Satzanfangs-Guard:** Tokens am Satzanfang werden nicht automatisch als Name gewertet (außer via Kontext)
-- **Honorifik-Lookback:** Bis 8 Token rückwärts für Tittelketten (Prof. Dr. med. Dr. h.c. mult.)
-- **Bindestrich-Namen:** Hans-Peter → beide Teile uppercase, keiner im Dictionary → Name
+- **Satzanfangs-Guard:** Tokens am Satzanfang werden nicht automatisch als Name gewertet (Rettung via Vornamensliste, Nachnamensliste, Genitiv, Anrede, und/oder-Paar, Verb-Kontext, Propagierung)
+- **Honorifik-Lookback:** Bis 8 Token rückwärts für Titelketten (Prof. Dr. med. Dr. h.c. mult.)
 - **Konsistente Platzhalter:** Gleicher Name → gleicher Platzhalter im gesamten Text
+- **Tests:** `src/analyser.test.js` (Vitest), `npm test`
 
 #### UI (`src/app.js`, `index.html`, `src/style.css`)
 - Interaktives Token-Popup: `× Löschen`, `✓ Kein Name`, `↔ Name-X ersetzen`
@@ -133,12 +137,18 @@ namescrub/
 
 ## Bekannte Einschränkungen / Tech-Debt
 
-- **Honorifik + Nachname ohne Vorname** (z.B. „Frau Müller"): spaCy erkennt dies nicht immer als PER — ein zusätzlicher regelbasierter Honorifik-Pass in `namescrub.py` würde helfen
 - **Web: Ortsnamen** werden nicht erkannt (nur Personen) — das Dictionary enthält keine Orte, und ein Ortsnamen-Lookup wäre ein eigenes Feature
-- **Web: Organisationsnamen** werden nicht erkannt
-- **Keine automatisierten Tests** — weder für `worker.js` noch für `namescrub.py`
-- **Kein CI/CD** — Build und Deploy sind manuelle Schritte
-- **Keine GitHub Releases** — NameScrub+ wird aktuell als Quellcode-ZIP verteilt
+- **Web: Organisationsnamen** werden nicht erkannt (nur `KNOWN_NON_PERSONS`-Ausschluss bekannter Marken)
+- **Keine Python-Tests** — `namescrub.py` / `namescrub_gui.py` sind ungetestet (Web hat Vitest)
+- **Kein Web-Deploy-CI** — `dist/` wird manuell auf Plesk deployt (Release-Workflow existiert nur für Desktop-Binaries)
+- **Popup am rechten Rand** kann aus dem Viewport ragen (kein Overflow-Flipping)
+- **Präfix-Änderung mitten in der Session** wirkt nur auf neu vergebene Platzhalter — bereits vergebene behalten das alte Präfix bis zur nächsten Analyse
+
+### Evaluierte Bibliotheken (Stand 2026-08)
+
+- **Client-seitige NER-Modelle (Transformers.js + deutsches BERT-NER als ONNX):** technisch möglich, aber 40–100+ MB Modell-Download pro Nutzer — widerspricht dem „sofort im Browser"-Konzept. Position: NameScrub+ (spaCy) IST der KI-Pfad; als optionaler „Genauer-Modus" im Web denkbar → Langfrist-Roadmap.
+- **compromise / wink-nlp:** nur Englisch, für deutsche NER unbrauchbar.
+- **Verbesserungsweg im Web stattdessen:** größere Datenbasis (Vornamen-/Nachnamenlisten) + Kontext-Heuristiken — umgesetzt.
 
 ---
 
@@ -147,21 +157,22 @@ namescrub/
 ### Kurzfristig (nächste Sessions)
 
 #### Web
-- [ ] **E-Mail-Adressen** erkennen und anonymisieren (`user@domain.tld` → `Email-1`)
-- [ ] **Telefonnummern** erkennen (`+49 123 456789` → `Tel-1`)
-- [ ] **Datumsangaben** optional erkennen (`12.03.2024` → `Datum-1`)
-- [ ] **Konfigurierbare Labels** — User kann Platzhalter-Präfix selbst wählen
+- [x] **E-Mail-Adressen** erkennen und anonymisieren (`user@domain.tld` → `Email-1`)
+- [x] **Telefonnummern** erkennen (`+49 123 456789` → `Tel-1`)
+- [x] **Datumsangaben** optional erkennen (`12.03.2024` → `Datum-1`)
+- [x] **Konfigurierbare Labels** — User kann Platzhalter-Präfix selbst wählen (localStorage)
+- [ ] **Popup-Overflow-Flipping** am rechten Viewport-Rand
 
 #### NameScrub+ Desktop
-- [ ] **GitHub Releases** mit vorgefertigten Executables (Windows .exe, macOS .app, Linux)
-- [ ] **Honorifik-Fallback-Pass** in `namescrub.py` für „Frau Müller"-Fälle ohne Vornamen
-- [ ] **Fortschrittsbalken** in der GUI für lange Texte
-- [ ] **Batch-Verarbeitung** auch in der GUI (Ordner auswählen)
+- [x] **GitHub Releases** mit vorgefertigten Executables (`.github/workflows/release.yml`, Tag `v*.*.*`)
+- [x] **Honorifik-Fallback-Pass** in `namescrub.py` für „Frau Müller"-Fälle ohne Vornamen
+- [x] **Fortschrittsbalken** in der GUI für lange Texte
+- [x] **Batch-Verarbeitung** auch in der GUI (Ordner auswählen)
 
 ### Mittelfristig
 
 #### Web
-- [ ] **Adressen** erkennen (Straße + Hausnummer + PLZ + Ort)
+- [x] **Adressen** erkennen (Straße + Hausnummer, optional PLZ + Ort)
 - [ ] **IBAN / Kontonummern** erkennen
 - [ ] **Mehrsprachige Unterstützung** (EN, FR, …) — eigene Dictionaries
 
